@@ -1,0 +1,19 @@
+{
+  "malicious_ips": [
+    "91.92.242.30",
+    "92.92.242.30",
+    "95.92.242.30",
+    "96.92.242.30",
+    "11.92.242.30",
+    "54.91.154.110",
+    "202.161.50.59",
+    "104.18.38.233"
+  ],
+  "malicious_domains": [
+    "socifiapp.com",
+    "rentry.co/openclaw-core",
+    "install.app-distribution.net",
+    "glot.io/snippets/hfdxv8uyaf",
+    "glot.io/snippets/hfd3x9ueu5"
+  ]
+}
