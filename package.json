@@ -1,6 +1,6 @@
 {
   "name": "agentshield",
-  "version": "0.2.0",
+  "version": "0.6.0",
   "description": "Security scanner for AI agent ecosystems",
   "main": "dist/index.js",
   "bin": {
