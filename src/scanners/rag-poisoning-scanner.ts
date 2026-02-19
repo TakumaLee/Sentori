@@ -2,6 +2,20 @@ import { ScannerModule, ScanResult, Finding, ScannerOptions } from '../types';
 import { findFiles, readFileContent, isTestOrDocFile, isSentoriSourceFile } from '../utils/file-utils';
 
 /**
+ * Workspace configuration directories and files that are part of the AI agent's
+ * design and should not be flagged as RAG poisoning risks.
+ */
+const WORKSPACE_CONFIG_PATTERNS = [
+  /[/\\]\.openclaw[/\\]workspace[/\\]SOUL\.md$/i,
+  /[/\\]\.openclaw[/\\]workspace[/\\]rules[/\\]/i,
+  /[/\\]\.openclaw[/\\]workspace[/\\]memory[/\\]/i,
+];
+
+function isWorkspaceConfigFile(filePath: string): boolean {
+  return WORKSPACE_CONFIG_PATTERNS.some(p => p.test(filePath));
+}
+
+/**
  * Detects repetition attacks where same content is repeated excessively
  * to poison RAG retrieval results.
  */
@@ -130,6 +144,12 @@ export const ragPoisoningScanner: ScannerModule = {
     for (const file of files) {
       const isTestFile = isTestOrDocFile(file);
       const isSentoriSrc = isSentoriSourceFile(file);
+
+      // Skip workspace configuration files (SOUL.md, rules/, memory/)
+      if (isWorkspaceConfigFile(file)) {
+        // These are system design files, not RAG poisoning risks
+        continue;
+      }
 
       // Skip Sentori's own source (unless explicitly vendored/copied)
       if (isSentoriSrc && !options?.includeVendored) continue;

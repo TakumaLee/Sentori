@@ -15,6 +15,12 @@ export const promptInjectionTester: ScannerModule = {
       try {
         const content = readFileContent(file);
 
+        // Skip workspace configuration files (SOUL.md, rules/, memory/)
+        if (isWorkspaceConfigFile(file)) {
+          // These are system design files, not injection risks
+          continue;
+        }
+
         // Check if this is a defense blocklist / pattern list file
         if (isDefensePatternFile(content, file)) {
           // Skip or downgrade — these are defensive configs, not attacks
@@ -196,8 +202,22 @@ const SYSTEM_PROMPT_FILE_PATTERNS = [
   /[/\\]system[_-]?prompt/i,
 ];
 
+/**
+ * Workspace configuration directories and files that are part of the AI agent's
+ * design and should not be flagged as injection risks.
+ */
+const WORKSPACE_CONFIG_PATTERNS = [
+  /[/\\]\.openclaw[/\\]workspace[/\\]SOUL\.md$/i,
+  /[/\\]\.openclaw[/\\]workspace[/\\]rules[/\\]/i,
+  /[/\\]\.openclaw[/\\]workspace[/\\]memory[/\\]/i,
+];
+
 export function isSystemPromptFile(filePath: string): boolean {
   return SYSTEM_PROMPT_FILE_PATTERNS.some(p => p.test(filePath));
+}
+
+export function isWorkspaceConfigFile(filePath: string): boolean {
+  return WORKSPACE_CONFIG_PATTERNS.some(p => p.test(filePath));
 }
 
 /**
