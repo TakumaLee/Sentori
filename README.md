@@ -6,7 +6,7 @@
 
 [![npm version](https://img.shields.io/npm/v/@nexylore/sentori.svg)](https://www.npmjs.com/package/@nexylore/sentori)
 [![license](https://img.shields.io/npm/l/@nexylore/sentori.svg)](./LICENSE)
-[![tests](https://img.shields.io/github/actions/workflow/status/TakumaLee/AgentShield/ci.yml?label=tests)](https://github.com/TakumaLee/AgentShield/actions)
+[![tests](https://img.shields.io/github/actions/workflow/status/TakumaLee/Sentori/ci.yml?label=tests)](https://github.com/TakumaLee/Sentori/actions)
 
 **Sentori** is a security scanner purpose-built for the MCP (Model Context Protocol) ecosystem and AI agent toolchains. Where broad surface-area tools scan everything loosely, Sentori goes deep — covering prompt injection, supply chain poisoning, MCP misconfigs, secret leaks, and agentic attack vectors that generic scanners miss entirely.
 
@@ -171,7 +171,7 @@ Sentori outputs a **Security Grade** (A+ to F) based on weighted findings across
 
 ```yaml
 - name: Sentori Security Scan
-  uses: TakumaLee/AgentShield@main
+  uses: TakumaLee/Sentori@main
   with:
     scan-path: '.'
     fail-on-critical: 'true'
@@ -183,6 +183,47 @@ Sentori outputs a **Security Grade** (A+ to F) based on weighted findings across
 | `scan-path` | Path to scan | `.` |
 | `fail-on-critical` | Fail workflow on critical findings | `true` |
 | `output-format` | Output format (`text` or `json`) | `text` |
+
+---
+
+## 🛡️ Security Badge
+
+Display your project's MCP security status directly in your README with a Sentori badge.
+
+### Badge URL Format
+
+```
+https://sentori.nexylore.com/api/badge/:owner/:repo
+```
+
+Replace `:owner` with your GitHub username/org and `:repo` with your repository name.
+
+### Markdown Embed
+
+```markdown
+[![Sentori Security](https://sentori.nexylore.com/api/badge/OWNER/REPO)](https://sentori.nexylore.com)
+```
+
+**Example** (replace `OWNER` and `REPO` with your values):
+
+```markdown
+[![Sentori Security](https://sentori.nexylore.com/api/badge/TakumaLee/my-mcp-server)](https://sentori.nexylore.com)
+```
+
+### Badge Status Levels
+
+| Badge | Status | Description |
+|-------|--------|-------------|
+| ![Safe](https://img.shields.io/badge/Sentori-Safe-brightgreen) | **Safe** | No security issues detected |
+| ![Warning](https://img.shields.io/badge/Sentori-Warning-yellow) | **Warning** | Medium-severity findings present |
+| ![Critical](https://img.shields.io/badge/Sentori-Critical-red) | **Critical** | High or critical findings detected |
+| ![Unscanned](https://img.shields.io/badge/Sentori-Unscanned-lightgrey) | **Unscanned** | Repository has not been scanned yet |
+
+### How It Works
+
+1. Run `npx @nexylore/sentori scan` on your project and push the results via the [Sentori Dashboard](https://sentori.nexylore.com)
+2. The badge automatically reflects your latest scan result
+3. Badge updates within minutes of each new scan
 
 ---
 
