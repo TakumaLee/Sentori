@@ -202,6 +202,9 @@ function downgradeSeverity(severity: Severity, levels: number): Severity {
 
 // --- Scanner ---
 
+/** Scan extensions for node_modules */
+const NODE_MODULES_SCAN_EXTENSIONS = new Set(['.md', '.sh', '.py', '.js', '.ts', '.yaml', '.yml', '.json']);
+
 export class ConventionSquattingScanner implements Scanner {
   name = 'ConventionSquattingScanner';
   description =
@@ -215,23 +218,33 @@ export class ConventionSquattingScanner implements Scanner {
   private enableContextScoring: boolean;
   /** Injected fetcher for testing. */
   private fetcher: (url: string) => Promise<any>;
+  /** Scan depth for node_modules: 1 = direct deps only, 0 = skip node_modules, -1 = unlimited */
+  private nodeModulesDepth: number;
 
   constructor(opts?: { 
     resolver?: (hostname: string) => Promise<string[]>; 
     dnsCheck?: boolean;
     enableContextScoring?: boolean;
     fetcher?: (url: string) => Promise<any>;
+    nodeModulesDepth?: number;
   }) {
     this.resolver = opts?.resolver ?? defaultResolve;
     this.dnsCheck = opts?.dnsCheck ?? false;
     this.enableContextScoring = opts?.enableContextScoring ?? true;
     this.fetcher = opts?.fetcher ?? defaultFetcher;
+    this.nodeModulesDepth = opts?.nodeModulesDepth ?? 1;
   }
 
   async scan(targetDir: string): Promise<ScanResult> {
     const start = Date.now();
     const files = walkFiles(targetDir);
     const findings: Finding[] = [];
+
+    // Scan node_modules if enabled
+    if (this.nodeModulesDepth > 0) {
+      const nodeModulesFiles = this.scanNodeModules(targetDir, this.nodeModulesDepth);
+      files.push(...nodeModulesFiles);
+    }
 
     // Rule 1: Convention Filename TLD Collision
     for (const file of files) {
@@ -346,5 +359,100 @@ export class ConventionSquattingScanner implements Scanner {
       filesScanned: files.length,
       duration: Date.now() - start,
     };
+  }
+
+  /**
+   * Scan node_modules directory up to specified depth.
+   * depth: 1 = direct deps only, -1 = unlimited
+   */
+  private scanNodeModules(targetDir: string, maxDepth: number): FileEntry[] {
+    const nodeModulesPath = path.join(targetDir, 'node_modules');
+    const files: FileEntry[] = [];
+
+    if (!fs.existsSync(nodeModulesPath)) {
+      return files;
+    }
+
+    const scanPackageDir = (packagePath: string, currentDepth: number): void => {
+      if (maxDepth !== -1 && currentDepth > maxDepth) {
+        return;
+      }
+
+      try {
+        const entries = fs.readdirSync(packagePath, { withFileTypes: true });
+        
+        for (const entry of entries) {
+          const fullPath = path.join(packagePath, entry.name);
+          
+          if (entry.isFile()) {
+            const ext = path.extname(entry.name).toLowerCase();
+            if (NODE_MODULES_SCAN_EXTENSIONS.has(ext)) {
+              try {
+                const content = fs.readFileSync(fullPath, 'utf-8');
+                files.push({
+                  path: fullPath,
+                  relativePath: path.relative(targetDir, fullPath),
+                  content,
+                });
+              } catch {
+                // skip unreadable files
+              }
+            }
+          } else if (entry.isDirectory() && entry.name === 'node_modules') {
+            // Nested node_modules found, scan it recursively if depth allows
+            const nestedEntries = fs.readdirSync(fullPath, { withFileTypes: true });
+            for (const nestedEntry of nestedEntries) {
+              if (nestedEntry.isDirectory()) {
+                if (nestedEntry.name.startsWith('@')) {
+                  // Scoped package
+                  const scopePath = path.join(fullPath, nestedEntry.name);
+                  const scopedEntries = fs.readdirSync(scopePath, { withFileTypes: true });
+                  for (const scopedEntry of scopedEntries) {
+                    if (scopedEntry.isDirectory()) {
+                      scanPackageDir(path.join(scopePath, scopedEntry.name), currentDepth + 1);
+                    }
+                  }
+                } else {
+                  // Regular package
+                  scanPackageDir(path.join(fullPath, nestedEntry.name), currentDepth + 1);
+                }
+              }
+            }
+          }
+        }
+      } catch {
+        // skip unreadable directories
+      }
+    };
+
+    // Scan top-level packages in node_modules
+    try {
+      const entries = fs.readdirSync(nodeModulesPath, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        
+        if (entry.name.startsWith('@')) {
+          // Scoped package (@org/package)
+          const scopePath = path.join(nodeModulesPath, entry.name);
+          try {
+            const scopedEntries = fs.readdirSync(scopePath, { withFileTypes: true });
+            for (const scopedEntry of scopedEntries) {
+              if (scopedEntry.isDirectory()) {
+                scanPackageDir(path.join(scopePath, scopedEntry.name), 1);
+              }
+            }
+          } catch {
+            // skip unreadable scope directory
+          }
+        } else {
+          // Regular package
+          scanPackageDir(path.join(nodeModulesPath, entry.name), 1);
+        }
+      }
+    } catch {
+      // skip if node_modules is unreadable
+    }
+
+    return files;
   }
 }
