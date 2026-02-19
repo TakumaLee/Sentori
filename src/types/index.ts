@@ -69,7 +69,7 @@ export interface ScannerOptions {
   exclude?: string[];
   context?: ScanContext;
   includeVendored?: boolean;
-  /** Additional glob patterns from .agentshieldignore */
+  /** Additional glob patterns from .sentoriignore */
   agentshieldIgnorePatterns?: string[];
 }
 

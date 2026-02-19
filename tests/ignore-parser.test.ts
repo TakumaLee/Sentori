@@ -1,4 +1,4 @@
-import { parseIgnoreFile, loadIgnorePatterns, ignoreToGlobPatterns, shouldIgnoreFile, DEFAULT_AGENTSHIELD_IGNORE } from '../src/utils/ignore-parser';
+import { parseIgnoreFile, loadIgnorePatterns, ignoreToGlobPatterns, shouldIgnoreFile, DEFAULT_SENTORI_IGNORE } from '../src/utils/ignore-parser';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -39,15 +39,15 @@ bar/
     });
   });
 
-  describe('DEFAULT_AGENTSHIELD_IGNORE', () => {
+  describe('DEFAULT_SENTORI_IGNORE', () => {
     it('should include standard defaults', () => {
-      expect(DEFAULT_AGENTSHIELD_IGNORE).toContain('node_modules/');
-      expect(DEFAULT_AGENTSHIELD_IGNORE).toContain('*.test.*');
-      expect(DEFAULT_AGENTSHIELD_IGNORE).toContain('tests/');
-      expect(DEFAULT_AGENTSHIELD_IGNORE).toContain('coverage/');
-      expect(DEFAULT_AGENTSHIELD_IGNORE).toContain('.git/');
-      expect(DEFAULT_AGENTSHIELD_IGNORE).toContain('__tests__/');
-      expect(DEFAULT_AGENTSHIELD_IGNORE).toContain('__test__/');
+      expect(DEFAULT_SENTORI_IGNORE).toContain('node_modules/');
+      expect(DEFAULT_SENTORI_IGNORE).toContain('*.test.*');
+      expect(DEFAULT_SENTORI_IGNORE).toContain('tests/');
+      expect(DEFAULT_SENTORI_IGNORE).toContain('coverage/');
+      expect(DEFAULT_SENTORI_IGNORE).toContain('.git/');
+      expect(DEFAULT_SENTORI_IGNORE).toContain('__tests__/');
+      expect(DEFAULT_SENTORI_IGNORE).toContain('__test__/');
     });
   });
 
@@ -55,21 +55,21 @@ bar/
     let tmpDir: string;
 
     beforeEach(() => {
-      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentshield-test-'));
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentori-test-'));
     });
 
     afterEach(() => {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     });
 
-    it('should return defaults when no .agentshieldignore exists', () => {
+    it('should return defaults when no .sentoriignore exists', () => {
       const { patterns, hasFile } = loadIgnorePatterns(tmpDir);
       expect(hasFile).toBe(false);
-      expect(patterns).toEqual(DEFAULT_AGENTSHIELD_IGNORE);
+      expect(patterns).toEqual(DEFAULT_SENTORI_IGNORE);
     });
 
     it('should merge user patterns with defaults', () => {
-      fs.writeFileSync(path.join(tmpDir, '.agentshieldignore'), 'custom-dir/\n*.log\n');
+      fs.writeFileSync(path.join(tmpDir, '.sentoriignore'), 'custom-dir/\n*.log\n');
       const { patterns, hasFile } = loadIgnorePatterns(tmpDir);
       expect(hasFile).toBe(true);
       expect(patterns).toContain('custom-dir/');
@@ -79,7 +79,7 @@ bar/
     });
 
     it('should handle negation to remove defaults', () => {
-      fs.writeFileSync(path.join(tmpDir, '.agentshieldignore'), '!tests/\n');
+      fs.writeFileSync(path.join(tmpDir, '.sentoriignore'), '!tests/\n');
       const { patterns } = loadIgnorePatterns(tmpDir);
       expect(patterns).not.toContain('tests/');
       // Other defaults still present

@@ -1,5 +1,5 @@
 /**
- * AgentShield Security Review Fixes Test Suite - 2026-02-05
+ * Sentori Security Review Fixes Test Suite - 2026-02-05
  * Tests for the 6 Critical and 15 Medium fixes implemented
  */
 
@@ -9,7 +9,7 @@ import { channelSurfaceAuditor, detectChannels } from '../src/scanners/channel-s
 import { promptInjectionTester, scanContent } from '../src/scanners/prompt-injection-tester';
 import { INJECTION_PATTERNS } from '../src/patterns/injection-patterns';
 
-describe('AgentShield Security Review Fixes 2026', () => {
+describe('Sentori Security Review Fixes 2026', () => {
   
   // === CRITICAL FIXES ===
   

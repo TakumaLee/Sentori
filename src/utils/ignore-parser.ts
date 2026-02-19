@@ -2,9 +2,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 /**
- * Default patterns for .agentshieldignore (always excluded unless overridden)
+ * Default patterns for .sentoriignore (always excluded unless overridden)
  */
-export const DEFAULT_AGENTSHIELD_IGNORE = [
+export const DEFAULT_SENTORI_IGNORE = [
   'node_modules/',
   '*.test.*',
   '__test__/',
@@ -15,7 +15,7 @@ export const DEFAULT_AGENTSHIELD_IGNORE = [
 ];
 
 /**
- * Parse a .agentshieldignore file (gitignore-like syntax).
+ * Parse a .sentoriignore file (gitignore-like syntax).
  * Returns an array of patterns (strings).
  * 
  * Supports:
@@ -33,12 +33,12 @@ export function parseIgnoreFile(content: string): string[] {
 }
 
 /**
- * Read and parse a .agentshieldignore file from a target directory.
+ * Read and parse a .sentoriignore file from a target directory.
  * Returns merged patterns (defaults + user patterns).
  * Negation patterns (!) remove matching default patterns.
  */
 export function loadIgnorePatterns(targetPath: string): { patterns: string[]; hasFile: boolean } {
-  const ignorePath = path.join(targetPath, '.agentshieldignore');
+  const ignorePath = path.join(targetPath, '.sentoriignore');
   let userPatterns: string[] = [];
   let hasFile = false;
 
@@ -59,7 +59,7 @@ export function loadIgnorePatterns(targetPath: string): { patterns: string[]; ha
   const additions = userPatterns.filter(p => !p.startsWith('!'));
 
   // Start with defaults, remove negated ones
-  let merged = DEFAULT_AGENTSHIELD_IGNORE.filter(defaultPat => {
+  let merged = DEFAULT_SENTORI_IGNORE.filter(defaultPat => {
     return !negations.some(neg => neg === defaultPat || neg === defaultPat.replace(/\/$/, ''));
   });
 
@@ -70,7 +70,7 @@ export function loadIgnorePatterns(targetPath: string): { patterns: string[]; ha
 }
 
 /**
- * Convert .agentshieldignore patterns to glob ignore patterns
+ * Convert .sentoriignore patterns to glob ignore patterns
  * compatible with the glob library.
  */
 export function ignoreToGlobPatterns(patterns: string[]): string[] {

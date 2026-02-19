@@ -57,11 +57,11 @@ function getVersion(): string {
 
 function printHelp(): void {
   console.log('');
-  console.log(chalk.bold.cyan('  🛡️  AgentShield') + chalk.gray(` v${getVersion()}`));
-  console.log(chalk.white('  Security scanner for AI Agent ecosystems'));
+  console.log(chalk.bold.cyan('  🛡️  Sentori') + chalk.gray(` v${getVersion()}`));
+  console.log(chalk.white('  AI Agent Security Scanner — MCP-focused security for the agentic era'));
   console.log('');
   console.log(chalk.bold('  Usage:'));
-  console.log(chalk.gray('    npx aiagentshield [target-dir] [options]'));
+  console.log(chalk.gray('    npx @nexylore/sentori [scan] [target-dir] [options]'));
   console.log('');
   console.log(chalk.bold('  Options:'));
   console.log(chalk.gray('    --help, -h         Show help'));
@@ -72,10 +72,11 @@ function printHelp(): void {
   console.log(chalk.gray('    --deep-scan        Enable OCR scanning of image files (slow)'));
   console.log('');
   console.log(chalk.bold('  Examples:'));
-  console.log(chalk.cyan('    npx aiagentshield ./my-agent'));
-  console.log(chalk.cyan('    npx aiagentshield ./my-agent --json'));
-  console.log(chalk.cyan('    npx aiagentshield ./my-agent --output report.json'));
-  console.log(chalk.cyan('    npx aiagentshield ./my-agent --ioc ./custom-ioc.json'));
+  console.log(chalk.cyan('    npx @nexylore/sentori scan'));
+  console.log(chalk.cyan('    npx @nexylore/sentori scan ./my-agent'));
+  console.log(chalk.cyan('    npx @nexylore/sentori scan ./my-agent --json'));
+  console.log(chalk.cyan('    npx @nexylore/sentori scan ./my-agent --output report.json'));
+  console.log(chalk.cyan('    npx @nexylore/sentori scan ./my-agent --ioc ./custom-ioc.json'));
   console.log('');
 }
 
@@ -96,7 +97,7 @@ async function main(): Promise<void> {
   const jsonMode = args.includes('--json');
   const deepScan = args.includes('--deep-scan');
   if (deepScan) {
-    process.env.AGENTSHIELD_DEEP_SCAN = '1';
+    process.env.SENTORI_DEEP_SCAN = '1';
   }
 
   let outputPath: string | undefined;
@@ -117,9 +118,14 @@ async function main(): Promise<void> {
     const idx = args.findIndex((a) => a === flag);
     if (idx !== -1) flagValuePositions.add(idx + 1);
   }
-  const positional = args.filter(
+  let positional = args.filter(
     (a, i) => !a.startsWith('-') && !flagValuePositions.has(i)
   );
+
+  // Support `sentori scan [dir]` subcommand
+  if (positional[0] === 'scan') {
+    positional = positional.slice(1);
+  }
 
   const targetDir = path.resolve(positional[0] || process.cwd());
   // Legacy: second positional was ioc path
@@ -136,7 +142,7 @@ async function main(): Promise<void> {
 
   if (!jsonMode) {
     console.log('');
-    console.log(chalk.bold.cyan('  🛡️  AgentShield') + chalk.gray(` v${version}`));
+    console.log(chalk.bold.cyan('  🛡️  Sentori') + chalk.gray(` v${version}`));
     console.log(chalk.gray(`  Scanning: ${targetDir}`));
     console.log('');
   }

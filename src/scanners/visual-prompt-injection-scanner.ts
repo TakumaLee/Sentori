@@ -33,7 +33,7 @@ export class VisualPromptInjectionScanner implements Scanner {
     }
 
     // Scan image files only in deep-scan mode (OCR is slow)
-    if (!process.env.AGENTSHIELD_DEEP_SCAN) {
+    if (!process.env.SENTORI_DEEP_SCAN) {
       return {
         scanner: this.name,
         findings,

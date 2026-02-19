@@ -53,7 +53,7 @@ describe('Reporter', () => {
       const report = makeReport();
       printReport(report);
       const output = consoleSpy.mock.calls.map(c => c[0]).join('\n');
-      expect(output).toContain('AgentShield');
+      expect(output).toContain('Sentori');
       expect(output).toContain('No vulnerabilities found');
       expect(output).toContain('A+');
     });

@@ -43,7 +43,7 @@ const DEFAULT_IGNORE = [
   '**/.cache/**',
   '**/tmp/**',
   '**/DerivedData/**',
-  '**/agentshield-report*.json',
+  '**/sentori-report*.json',
   // Browser user-data / extensions (not agent code)
   '**/browser/*/user-data/**',
   '**/user-data/*/Extensions/**',
@@ -178,7 +178,7 @@ export function isAgentShieldProject(targetPath: string): boolean {
   const pkgPath = require('path').join(targetPath, 'package.json');
   try {
     const pkg = JSON.parse(require('fs').readFileSync(pkgPath, 'utf-8'));
-    return pkg.name === 'aiagentshield';
+    return pkg.name === '@nexylore/sentori';
   } catch {
     return false;
   }

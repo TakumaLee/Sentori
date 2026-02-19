@@ -58,7 +58,7 @@ export function walkFiles(dir: string, extensionsOrOpts?: Set<string> | WalkOpti
           try {
             const stat = fs.statSync(fullPath);
             if (stat.size > maxFileSize) {
-              console.warn(`[AgentShield] Skipping large file (${(stat.size / 1024 / 1024).toFixed(1)} MB): ${path.relative(dir, fullPath)}`);
+              console.warn(`[Sentori] Skipping large file (${(stat.size / 1024 / 1024).toFixed(1)} MB): ${path.relative(dir, fullPath)}`);
               continue;
             }
             const content = fs.readFileSync(fullPath, 'utf-8');

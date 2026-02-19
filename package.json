@@ -1,7 +1,7 @@
 {
-  "name": "aiagentshield",
+  "name": "@nexylore/sentori",
   "version": "0.8.1",
-  "description": "Security scanner for AI Agents and MCP Servers — 10 scanners for prompt injection, supply chain poisoning, secret leaks, and misconfigs",
+  "description": "AI Agent Security Scanner — 守るべきものを、守る。MCP-focused security for the agentic era.",
   "main": "dist/cli.js",
   "types": "dist/cli.d.ts",
   "files": [
@@ -14,7 +14,7 @@
     "url": "https://github.com/TakumaLee/AgentShield.git"
   },
   "bin": {
-    "aiagentshield": "dist/cli.js"
+    "sentori": "dist/cli.js"
   },
   "scripts": {
     "build": "tsc",
@@ -37,9 +37,11 @@
     "llm",
     "ai-safety",
     "secret-detection",
-    "red-team"
+    "red-team",
+    "sentori",
+    "nexylore"
   ],
-  "author": "AgentShield Contributors",
+  "author": "Nexylore",
   "license": "MIT",
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",

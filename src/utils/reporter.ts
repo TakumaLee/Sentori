@@ -49,7 +49,7 @@ export function printReport(report: ScanReport): void {
   console.log('');
   console.log(DIVIDER);
   console.log(
-    chalk.bold.cyan('  🛡️  AgentShield') +
+    chalk.bold.cyan('  🛡️  Sentori') +
     chalk.gray(` v${report.version ?? ''}`) +
     chalk.gray('  Security Report')
   );
