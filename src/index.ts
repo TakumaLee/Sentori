@@ -4,6 +4,7 @@ export { HygieneAuditor } from './scanners/hygiene-auditor';
 export { DxtSecurityScanner } from './scanners/dxt-security-scanner';
 export { VisualPromptInjectionScanner } from './scanners/visual-prompt-injection-scanner';
 export { LangChainSerializationScanner } from './scanners/langchain-serialization-scanner';
+export { AgenticFrameworkScanner } from './scanners/agentic-framework-scanner';
 export { PostinstallScanner } from './scanners/postinstall-scanner';
 export { ConventionSquattingScanner } from './scanners/convention-squatting-scanner';
 export { clipboardExfiltrationScanner } from './scanners/clipboard-exfiltration-scanner';
@@ -32,6 +33,7 @@ import { HygieneAuditor } from './scanners/hygiene-auditor';
 import { DxtSecurityScanner } from './scanners/dxt-security-scanner';
 import { VisualPromptInjectionScanner } from './scanners/visual-prompt-injection-scanner';
 import { LangChainSerializationScanner } from './scanners/langchain-serialization-scanner';
+import { AgenticFrameworkScanner } from './scanners/agentic-framework-scanner';
 import { PostinstallScanner } from './scanners/postinstall-scanner';
 import { ConventionSquattingScanner } from './scanners/convention-squatting-scanner';
 // Module-based scanners (ScannerModule interface, compatible with Scanner)
@@ -60,6 +62,7 @@ export function createDefaultRegistry(externalIOCPath?: string): ScannerRegistry
   registry.register(new DxtSecurityScanner());
   registry.register(new VisualPromptInjectionScanner());
   registry.register(new LangChainSerializationScanner());
+  registry.register(new AgenticFrameworkScanner());
   registry.register(new PostinstallScanner());
   registry.register(new ConventionSquattingScanner());
 
