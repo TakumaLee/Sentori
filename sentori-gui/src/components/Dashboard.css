@@ -1,0 +1,129 @@
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.dashboard-hero {
+  text-align: center;
+  padding: 48px 24px;
+}
+
+.dashboard-title {
+  font-size: 36px;
+  font-weight: 800;
+  color: #e2e8f0;
+  margin-bottom: 12px;
+  letter-spacing: -1px;
+}
+
+.dashboard-subtitle {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 32px;
+}
+
+.start-scan-btn {
+  padding: 14px 32px;
+  background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 24px rgba(56, 189, 248, 0.3);
+}
+
+.start-scan-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(56, 189, 248, 0.4);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.stat-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.stat-label {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-value {
+  font-size: 40px;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.recent-scans h2 {
+  font-size: 18px;
+  color: #e2e8f0;
+  margin-bottom: 16px;
+}
+
+.scan-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scan-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+}
+
+.scan-target {
+  flex: 1;
+  font-size: 14px;
+  color: #e2e8f0;
+  font-family: monospace;
+}
+
+.scan-findings {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.scan-severity {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.scan-time {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 48px;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 15px;
+}

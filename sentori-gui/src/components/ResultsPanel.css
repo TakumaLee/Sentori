@@ -1,0 +1,77 @@
+.results-panel {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.results-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin-bottom: 24px;
+}
+
+.results-empty {
+  text-align: center;
+  padding: 64px;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 15px;
+}
+
+.results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.result-card {
+  padding: 18px 20px;
+  border: 1px solid;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.result-card:hover {
+  transform: translateX(2px);
+}
+
+.result-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.result-icon {
+  font-size: 18px;
+}
+
+.result-target {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 600;
+  color: #e2e8f0;
+  font-family: monospace;
+}
+
+.result-severity {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.result-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-left: 30px;
+}
+
+.result-findings {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.result-time {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.3);
+}

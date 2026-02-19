@@ -2,3 +2,8 @@ node_modules/
 dist/
 coverage/
 *.js.map
+
+# sentori-gui
+sentori-gui/node_modules/
+sentori-gui/dist/
+sentori-gui/src-tauri/target/
