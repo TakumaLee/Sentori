@@ -1,5 +1,7 @@
 # Changelog
 
+> **Note:** This project was formerly known as **AgentShield** (npm: `aiagentshield`). Renamed to **Sentori** (`@nexylore/sentori`) starting v0.8.1.
+
 ## [0.8.0] - 2026-02-18
 
 ### Added
@@ -24,7 +26,7 @@
   - SUPPLY-005: Data exfiltration pattern detection
   - SUPPLY-006: Persistence mechanism detection
 - External IOC blocklist support (custom JSON file)
-- CLI interface (`npx agentshield`)
+- CLI interface (`npx sentori`, formerly `npx aiagentshield`)
 
 ## [0.1.0] - Initial Release
 

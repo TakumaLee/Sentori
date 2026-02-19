@@ -1,5 +1,5 @@
-name: 'AgentShield Scan'
-description: 'Scan agent configurations for security risks using AgentShield'
+name: 'Sentori Scan'
+description: 'Scan agent configurations for security risks using Sentori'
 branding:
   icon: 'shield'
   color: 'blue'
@@ -26,11 +26,11 @@ runs:
       with:
         node-version: '20'
 
-    - name: Install AgentShield
+    - name: Install Sentori
       shell: bash
-      run: npm install -g aiagentshield@0.7.0
+      run: npm install -g @nexylore/sentori@0.7.0
 
-    - name: Run AgentShield Scan
+    - name: Run Sentori Scan
       id: scan
       shell: bash
       env:
@@ -40,9 +40,9 @@ runs:
       run: |
         set +e
         if [ "$OUTPUT_FORMAT" = "json" ]; then
-          OUTPUT=$(npx aiagentshield scan "$SCAN_PATH" --format json 2>&1)
+          OUTPUT=$(npx @nexylore/sentori scan "$SCAN_PATH" --format json 2>&1)
         else
-          OUTPUT=$(npx aiagentshield scan "$SCAN_PATH" 2>&1)
+          OUTPUT=$(npx @nexylore/sentori scan "$SCAN_PATH" 2>&1)
         fi
         EXIT_CODE=$?
         echo "$OUTPUT"
@@ -50,7 +50,7 @@ runs:
         # Check for critical findings
         if [ "$FAIL_ON_CRITICAL" = "true" ]; then
           if echo "$OUTPUT" | grep -qi "CRITICAL"; then
-            echo "::error::AgentShield detected CRITICAL findings. Failing workflow."
+            echo "::error::Sentori detected CRITICAL findings. Failing workflow."
             exit 1
           fi
         fi

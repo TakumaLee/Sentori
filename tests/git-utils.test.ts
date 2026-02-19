@@ -8,7 +8,7 @@ describe('Git Utils', () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentshield-git-test-'));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentori-git-test-'));
     // Initialize a git repo
     execSync('git init', { cwd: tmpDir, stdio: 'pipe' });
     execSync('git config user.email "test@test.com"', { cwd: tmpDir, stdio: 'pipe' });
@@ -35,7 +35,7 @@ describe('Git Utils', () => {
     });
 
     it('should return null for non-git directories', () => {
-      const nonGitDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentshield-nogit-'));
+      const nonGitDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentori-nogit-'));
       const filePath = path.join(nonGitDir, 'file.txt');
       fs.writeFileSync(filePath, 'content');
       expect(isGitTracked(filePath)).toBe(null);
@@ -100,7 +100,7 @@ describe('Git Utils', () => {
     });
 
     it('should return unknown for non-git directories', () => {
-      const nonGitDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentshield-nogit-'));
+      const nonGitDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentori-nogit-'));
       const filePath = path.join(nonGitDir, 'file.txt');
       fs.writeFileSync(filePath, 'content');
       const status = getGitTrackingStatus(nonGitDir, [filePath]);

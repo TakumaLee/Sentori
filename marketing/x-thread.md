@@ -34,7 +34,7 @@ AI Agent 的安全問題遠不止這個：
 你的 AI Agent 專案有多少這種隱患？大部分人根本沒掃過。
 
 ## 4/7
-所以我們做了 AgentShield 🛡️
+所以我們做了 Sentori 🛡️
 
 開源 AI Agent 安全掃描工具，13 個 scanner：
 
@@ -53,11 +53,11 @@ AI Agent 的安全問題遠不止這個：
 
 **CLI（本地掃描）：**
 ```
-npx aiagentshield /path/to/project
+npx @nexylore/sentori /path/to/project
 ```
 
 **網頁版（貼 GitHub URL 就能掃）：**
-agentshield-web.vercel.app
+sentori-web.vercel.app
 
 不用註冊、不用付錢、不用安裝。
 Paste a URL → get results. That's it.
@@ -75,9 +75,9 @@ AI Agent 時代的安全工具不能只看傳統漏洞，要看 trust boundary v
 ## 7/7
 AI Agent 是未來，但安全不能是事後想到的東西。
 
-🛡️ 免費掃描你的專案：agentshield-web.vercel.app
-📦 CLI: npx aiagentshield
-💻 GitHub: github.com/TakumaLee/AgentShield
+🛡️ 免費掃描你的專案：sentori-web.vercel.app
+📦 CLI: npx @nexylore/sentori
+💻 GitHub: github.com/TakumaLee/Sentori
 
 Star ⭐ 或 PR 都歡迎！
 

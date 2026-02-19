@@ -1,6 +1,6 @@
 import * as yaml from 'js-yaml';
 import { ScannerModule, ScanResult, Finding, ScanContext, ScannerOptions } from '../types';
-import { findConfigFiles, findPromptFiles, readFileContent, isJsonFile, isYamlFile, tryParseJson, isTestOrDocFile, hasAuthFiles, findFiles, isCacheOrDataFile, isAgentShieldSourceFile, isMarkdownFile } from '../utils/file-utils';
+import { findConfigFiles, findPromptFiles, readFileContent, isJsonFile, isYamlFile, tryParseJson, isTestOrDocFile, hasAuthFiles, findFiles, isCacheOrDataFile, isSentoriSourceFile, isMarkdownFile } from '../utils/file-utils';
 
 export const permissionAnalyzer: ScannerModule = {
   name: 'Permission Analyzer',
@@ -10,14 +10,14 @@ export const permissionAnalyzer: ScannerModule = {
     const start = Date.now();
     const findings: Finding[] = [];
     const context = options?.context || 'app';
-    const configFiles = await findConfigFiles(targetPath, options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
-    const promptFiles = await findPromptFiles(targetPath, options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
+    const configFiles = await findConfigFiles(targetPath, options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns);
+    const promptFiles = await findPromptFiles(targetPath, options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns);
     const allFiles = [...new Set([...configFiles, ...promptFiles])];
 
     // For framework context, check if any auth-related files exist in the project
     let projectHasAuthFiles = false;
     if (context === 'framework') {
-      const sourceFiles = await findFiles(targetPath, ['**/*.ts', '**/*.js', '**/*.py'], options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
+      const sourceFiles = await findFiles(targetPath, ['**/*.ts', '**/*.js', '**/*.py'], options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns);
       projectHasAuthFiles = hasAuthFiles([...allFiles, ...sourceFiles]);
     }
 
@@ -67,7 +67,7 @@ export const permissionAnalyzer: ScannerModule = {
         const content = readFileContent(file);
 
         const isMarkdownInfoFile = MARKDOWN_INFO_PATTERNS.some(p => p.test(file));
-        const isAgentShieldSrc = isAgentShieldSourceFile(file);
+        const isSentoriSrc = isSentoriSourceFile(file);
 
         // Analyze config files (skip package manifests)
         const isManifest = SKIP_CONFIG_PATTERNS.some(p => p.test(file));
@@ -130,9 +130,9 @@ export const permissionAnalyzer: ScannerModule = {
 
         // Downgrade markdown system-prompt/doc files to info for permission analysis
         // These files describe agent behavior in natural language, not actual tool configs
-        if (isMarkdownInfoFile || isAgentShieldSrc) {
-          const label = isAgentShieldSrc
-            ? '[AgentShield source file — pattern definition, not a vulnerability]'
+        if (isMarkdownInfoFile || isSentoriSrc) {
+          const label = isSentoriSrc
+            ? '[Sentori source file — pattern definition, not a vulnerability]'
             : '[markdown/system-prompt file — not a tool configuration]';
           for (const f of findings) {
             if (f.file === file && f.severity !== 'info') {

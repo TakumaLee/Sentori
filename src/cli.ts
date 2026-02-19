@@ -148,7 +148,23 @@ async function main(): Promise<void> {
   }
 
   const registry = createDefaultRegistry(iocPath);
-  const report = await registry.runAll(targetDir);
+
+  const report = await registry.runAll(targetDir, (step, total, name, result) => {
+    if (jsonMode) return;
+    const pct = Math.round((step / total) * 100);
+    const filled = Math.round((step / total) * 20);
+    const empty = 20 - filled;
+    const bar = chalk.green('█'.repeat(filled)) + chalk.gray('░'.repeat(empty));
+
+    if (!result) {
+      // Starting scanner
+      process.stdout.write(`\r  ${bar} ${pct}% · ${name}...`);
+    } else {
+      // Completed scanner
+      const findingsColor = result.findings.length > 0 ? chalk.yellow(String(result.findings.length)) : chalk.green('0');
+      process.stdout.write(`\r  ${bar} ${pct}% · ${name} ${chalk.gray('→')} ${findingsColor} findings ${chalk.gray(`(${result.duration}ms)`)}   \n`);
+    }
+  });
 
   // Ensure summary is populated (registry.runAll now always sets it, but be safe)
   if (!report.summary) {

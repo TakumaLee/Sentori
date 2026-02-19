@@ -1,4 +1,4 @@
-# AgentShield Scoring System Review — Team Alpha
+# Sentori Scoring System Review — Team Alpha
 
 > **Reviewer**: Scoring Review Team Alpha
 > **Date**: 2026-02-04

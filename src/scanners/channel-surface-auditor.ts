@@ -365,14 +365,14 @@ export const channelSurfaceAuditor: ScannerModule = {
     const findings: Finding[] = [];
 
     // Scan both prompt files and config files
-    const promptFiles = await findPromptFiles(targetPath, options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
-    const configFiles = await findConfigFiles(targetPath, options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
+    const promptFiles = await findPromptFiles(targetPath, options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns);
+    const configFiles = await findConfigFiles(targetPath, options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns);
     const allFiles = [...new Set([...promptFiles, ...configFiles])];
 
     // Also scan source files for code-level evidence of channel integrations
     const sourceFiles = await findFiles(targetPath, [
       '**/*.ts', '**/*.js', '**/*.py', '**/*.sh',
-    ], options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
+    ], options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns);
     const allSourceContent = new Map<string, string>();
     for (const file of sourceFiles) {
       try {

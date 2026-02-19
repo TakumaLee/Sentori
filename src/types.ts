@@ -25,6 +25,8 @@ export interface Finding {
   confidence?: Confidence;
   /** Tagged as [TEST] — from test files, excluded from scoring */
   isTestFile?: boolean;
+  /** Tagged as third-party code (node_modules, venv, vendor) vs own source code */
+  isThirdParty?: boolean;
 }
 
 export interface ScanResult {
@@ -79,7 +81,7 @@ export interface ScannerOptions {
   context?: ScanContext;
   includeVendored?: boolean;
   /** Additional glob patterns from .sentoriignore */
-  agentshieldIgnorePatterns?: string[];
+  sentoriIgnorePatterns?: string[];
 }
 
 export interface ScannerModule {

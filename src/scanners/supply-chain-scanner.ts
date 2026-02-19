@@ -17,6 +17,26 @@ interface Rule {
 const BASE64_REGEX = /[A-Za-z0-9+/]{50,}={0,2}/g;
 const SUSPICIOUS_DECODED = /\b(curl|wget|bash|sh|chmod|exec|eval)\b/i;
 
+/**
+ * Determine if a file path belongs to third-party dependencies vs own source code.
+ * Third-party includes: node_modules/, venv/, .venv/, vendor/, site-packages/, etc.
+ */
+function isThirdPartyCode(filePath: string): boolean {
+  const normalized = filePath.replace(/\\/g, '/');
+  const thirdPartyPatterns = [
+    /\/node_modules\//,
+    /\/\.venv\//,
+    /\/venv\//,
+    /\/vendor\//,
+    /\/site-packages\//,
+    /\/\.tox\//,
+    /\/\.eggs\//,
+    /\/bower_components\//,
+    /\/jspm_packages\//,
+  ];
+  return thirdPartyPatterns.some((pattern) => pattern.test(normalized));
+}
+
 function isValidBase64(s: string): boolean {
   try {
     const decoded = Buffer.from(s, 'base64').toString('utf-8');
@@ -68,6 +88,7 @@ const base64Rule: Rule = {
   severity: 'high',
   check(file: FileEntry): Finding[] {
     const findings: Finding[] = [];
+    const isThirdParty = isThirdPartyCode(file.path);
     let match: RegExpExecArray | null;
     const regex = new RegExp(BASE64_REGEX.source, 'g');
     while ((match = regex.exec(file.content)) !== null) {
@@ -83,6 +104,7 @@ const base64Rule: Rule = {
           line: findLineNumber(file.content, match.index),
           message: 'Suspicious Base64-encoded command detected',
           evidence: `Decoded: ${decoded.substring(0, 120)}`,
+          isThirdParty,
         });
       }
     }
@@ -106,6 +128,7 @@ const rceRule: Rule = {
   severity: 'critical',
   check(file: FileEntry): Finding[] {
     const findings: Finding[] = [];
+    const isThirdParty = isThirdPartyCode(file.path);
     for (const { pattern, desc } of RCE_PATTERNS) {
       const regex = new RegExp(pattern.source, pattern.flags);
       let match: RegExpExecArray | null;
@@ -118,6 +141,7 @@ const rceRule: Rule = {
           line: findLineNumber(file.content, match.index),
           message: `Remote code execution: ${desc}`,
           evidence: match[0].substring(0, 120),
+          isThirdParty,
         });
       }
     }
@@ -131,6 +155,7 @@ function createIOCRule(ioc: IOCBlocklist): Rule {
     severity: 'critical',
     check(file: FileEntry): Finding[] {
       const findings: Finding[] = [];
+      const isThirdParty = isThirdPartyCode(file.path);
       for (const ip of ioc.malicious_ips) {
         let idx = file.content.indexOf(ip);
         while (idx !== -1) {
@@ -142,6 +167,7 @@ function createIOCRule(ioc: IOCBlocklist): Rule {
             line: findLineNumber(file.content, idx),
             message: `Known malicious IP detected: ${ip}`,
             evidence: ip,
+            isThirdParty,
           });
           idx = file.content.indexOf(ip, idx + 1);
         }
@@ -157,6 +183,7 @@ function createIOCRule(ioc: IOCBlocklist): Rule {
             line: findLineNumber(file.content, idx),
             message: `Known malicious domain detected: ${domain}`,
             evidence: domain,
+            isThirdParty,
           });
           idx = file.content.indexOf(domain, idx + 1);
         }
@@ -179,6 +206,7 @@ const credentialRule: Rule = {
   severity: 'critical',
   check(file: FileEntry): Finding[] {
     const findings: Finding[] = [];
+    const isThirdParty = isThirdPartyCode(file.path);
     for (const { pattern, desc } of CREDENTIAL_PATTERNS) {
       const regex = new RegExp(pattern.source, pattern.flags);
       let match: RegExpExecArray | null;
@@ -191,6 +219,7 @@ const credentialRule: Rule = {
           line: findLineNumber(file.content, match.index),
           message: `Credential theft: ${desc}`,
           evidence: match[0].substring(0, 120),
+          isThirdParty,
         });
       }
     }
@@ -211,6 +240,7 @@ const exfilRule: Rule = {
   severity: 'high',
   check(file: FileEntry): Finding[] {
     const findings: Finding[] = [];
+    const isThirdParty = isThirdPartyCode(file.path);
     for (const { pattern, desc } of EXFIL_PATTERNS) {
       const regex = new RegExp(pattern.source, pattern.flags);
       let match: RegExpExecArray | null;
@@ -223,6 +253,7 @@ const exfilRule: Rule = {
           line: findLineNumber(file.content, match.index),
           message: `Data exfiltration: ${desc}`,
           evidence: match[0].substring(0, 120),
+          isThirdParty,
         });
       }
     }
@@ -244,6 +275,7 @@ const persistenceRule: Rule = {
   severity: 'high',
   check(file: FileEntry): Finding[] {
     const findings: Finding[] = [];
+    const isThirdParty = isThirdPartyCode(file.path);
     for (const { pattern, desc } of PERSISTENCE_PATTERNS) {
       const regex = new RegExp(pattern.source, pattern.flags);
       let match: RegExpExecArray | null;
@@ -256,6 +288,7 @@ const persistenceRule: Rule = {
           line: findLineNumber(file.content, match.index),
           message: `Persistence mechanism: ${desc}`,
           evidence: match[0].substring(0, 120),
+          isThirdParty,
         });
       }
     }
@@ -338,6 +371,7 @@ const pythonPackageRule: Rule = {
   check(file: FileEntry): Finding[] {
     if (!isPythonDepFile(file.path)) return [];
     const findings: Finding[] = [];
+    const isThirdParty = isThirdPartyCode(file.path);
     const lines = file.content.split('\n');
 
     const maliciousNormalized = new Map(
@@ -359,6 +393,7 @@ const pythonPackageRule: Rule = {
           line: i + 1,
           message: `Known malicious/typosquatted Python package: ${pkgName} (${reason})`,
           evidence: line.trim().substring(0, 120),
+          isThirdParty,
         });
       }
     }
@@ -383,6 +418,7 @@ const pythonPackageRule: Rule = {
               line: i + 1,
               message: `Known malicious/typosquatted Python package: ${rawName} (${reason})`,
               evidence: line.trim().substring(0, 120),
+              isThirdParty,
             });
           }
         }
@@ -399,6 +435,7 @@ const pythonURLRequirementRule: Rule = {
   check(file: FileEntry): Finding[] {
     if (!isPythonDepFile(file.path)) return [];
     const findings: Finding[] = [];
+    const isThirdParty = isThirdPartyCode(file.path);
     const lines = file.content.split('\n');
 
     for (let i = 0; i < lines.length; i++) {
@@ -417,6 +454,7 @@ const pythonURLRequirementRule: Rule = {
           line: i + 1,
           message: 'Suspicious URL-based Python dependency (non-trusted host)',
           evidence: match[0].substring(0, 120),
+          isThirdParty,
         });
       }
     }
@@ -449,6 +487,7 @@ const setupPyRule: Rule = {
     const basename = path.basename(file.path).toLowerCase();
     if (basename !== 'setup.py') return [];
     const findings: Finding[] = [];
+    const isThirdParty = isThirdPartyCode(file.path);
 
     for (const { pattern, desc } of SETUP_PY_DANGEROUS) {
       const regex = new RegExp(pattern.source, pattern.flags);
@@ -462,6 +501,7 @@ const setupPyRule: Rule = {
           line: findLineNumber(file.content, match.index),
           message: `Dangerous setup.py pattern: ${desc}`,
           evidence: match[0].substring(0, 120),
+          isThirdParty,
         });
       }
     }

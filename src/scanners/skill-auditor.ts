@@ -1,5 +1,5 @@
 import { ScannerModule, ScanResult, Finding, Severity, ScanContext, ScannerOptions } from '../types';
-import { findFiles, readFileContent, isTestOrDocFile, isFrameworkInfraFile, isUserInputFile, isSkillPluginFile, isAgentShieldTestFile, isAgentShieldSourceFile, isSecurityToolFile, isMarkdownFile, isTestFileForScoring } from '../utils/file-utils';
+import { findFiles, readFileContent, isTestOrDocFile, isFrameworkInfraFile, isUserInputFile, isSkillPluginFile, isSentoriTestFile, isSentoriSourceFile, isSecurityToolFile, isMarkdownFile, isTestFileForScoring } from '../utils/file-utils';
 
 interface SkillPattern {
   id: string;
@@ -299,7 +299,7 @@ export const skillAuditor: ScannerModule = {
       '**/*.ts',
       '**/*.py',
       '**/*.sh',
-    ], options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
+    ], options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns);
 
     for (const file of files) {
       try {
@@ -321,19 +321,19 @@ export const skillAuditor: ScannerModule = {
           }
         }
 
-        // AgentShield's own source/test files: pattern definitions, not vulnerabilities
-        if (isAgentShieldTestFile(file)) {
+        // Sentori's own source/test files: pattern definitions, not vulnerabilities
+        if (isSentoriTestFile(file)) {
           for (const f of fileFindings) {
             if (f.severity !== 'info') {
               f.severity = 'info';
               f.description += ' [security tool test file — intentional attack sample]';
             }
           }
-        } else if (isAgentShieldSourceFile(file)) {
+        } else if (isSentoriSourceFile(file)) {
           for (const f of fileFindings) {
             if (f.severity !== 'info') {
               f.severity = 'info';
-              f.description += ' [AgentShield source file — pattern definition, not a vulnerability]';
+              f.description += ' [Sentori source file — pattern definition, not a vulnerability]';
             }
           }
         } else if (isTestOrDocFile(file)) {

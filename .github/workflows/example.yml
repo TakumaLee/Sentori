@@ -1,4 +1,4 @@
-name: AgentShield Security Scan
+name: Sentori Security Scan
 
 on:
   push:
@@ -7,15 +7,15 @@ on:
     branches: [main]
 
 jobs:
-  agentshield:
+  sentori:
     runs-on: ubuntu-latest
     name: Scan agent configs
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Run AgentShield
-        uses: TakumaLee/AgentShield@main
+      - name: Run Sentori
+        uses: TakumaLee/Sentori@main
         with:
           scan-path: '.'
           fail-on-critical: 'true'

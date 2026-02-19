@@ -503,7 +503,7 @@ const CONFIG_FILENAMES = [
   'agent.yaml',
   'agent.yml',
   'agent-config.json',
-  'agentshield.json',
+  'sentori.json',
   '.agentrc.json',
 ];
 

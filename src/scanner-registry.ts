@@ -12,13 +12,17 @@ export class ScannerRegistry {
     return [...this.scanners];
   }
 
-  async runAll(targetDir: string): Promise<ScanReport> {
+  async runAll(targetDir: string, onProgress?: (step: number, total: number, scannerName: string, result?: ScanResult) => void): Promise<ScanReport> {
     const timestamp = new Date().toISOString();
     const results: ScanResult[] = [];
+    const total = this.scanners.length;
 
-    for (const scanner of this.scanners) {
+    for (let i = 0; i < total; i++) {
+      const scanner = this.scanners[i];
+      onProgress?.(i + 1, total, scanner.name);
       const result = await scanner.scan(targetDir);
       results.push(result);
+      onProgress?.(i + 1, total, scanner.name, result);
     }
 
     const summary = calculateSummary(results);

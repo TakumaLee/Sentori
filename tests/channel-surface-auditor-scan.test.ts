@@ -7,7 +7,7 @@ describe('Channel Surface Auditor - scan()', () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentshield-channel-'));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentori-channel-'));
   });
 
   afterEach(() => {

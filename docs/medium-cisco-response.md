@@ -10,7 +10,7 @@ If you're running OpenClaw — or any personal AI agent — you should read that
 
 The question isn't whether these risks exist. The question is what you're going to do about them.
 
-That's why we built **[AgentShield](https://github.com/TakumaLee/AgentShield)** — an open-source CLI tool that scans your AI agent setup for exactly these vulnerabilities. No cloud dependency, no subscription, no sending your configs to a third-party server. Just `npx` and answers.
+That's why we built **[Sentori](https://github.com/TakumaLee/Sentori)** — an open-source CLI tool that scans your AI agent setup for exactly these vulnerabilities. No cloud dependency, no subscription, no sending your configs to a third-party server. Just `npx` and answers.
 
 Let's walk through each risk Cisco flagged, and the concrete scanner you can run today to address it.
 
@@ -26,10 +26,10 @@ This is the most visceral risk. Your agent has a terminal. What's stopping it fr
 
 OpenClaw provides execution policies — allowlists, deny patterns, confirmation prompts. But misconfiguration is silent. You won't know your safety net has holes until something falls through.
 
-### AgentShield: Permission Analyzer + Agent Config Auditor
+### Sentori: Permission Analyzer + Agent Config Auditor
 
 ```bash
-npx aiagentshield scan --scanner permissions
+npx @nexylore/sentori scan --scanner permissions
 ```
 
 The **Permission Analyzer** inspects your agent's effective execution policy. It checks:
@@ -42,7 +42,7 @@ The **Permission Analyzer** inspects your agent's effective execution policy. It
 The **Agent Config Auditor** goes deeper into your `openclaw.yaml` and related configuration:
 
 ```bash
-npx aiagentshield scan --scanner config-audit
+npx @nexylore/sentori scan --scanner config-audit
 ```
 
 It flags common misconfigurations: execution policy set to `full` in production, missing confirmation prompts for destructive operations, and overly permissive file access patterns. Think of it as a linter, but for your agent's security posture.
@@ -55,10 +55,10 @@ Your agent's workspace is a living directory. Config files, `.env` files, skill 
 
 Cisco pointed out that agents routinely handle API keys, OAuth tokens, and database credentials. If an agent's workspace is compromised — or if the agent itself is tricked into reading and transmitting secrets — the blast radius extends far beyond the agent.
 
-### AgentShield: Secret Leak Scanner
+### Sentori: Secret Leak Scanner
 
 ```bash
-npx aiagentshield scan --scanner secrets
+npx @nexylore/sentori scan --scanner secrets
 ```
 
 The **Secret Leak Scanner** performs recursive analysis of your agent's workspace directory. It detects:
@@ -73,10 +73,10 @@ It uses pattern matching combined with entropy analysis — high-entropy strings
 
 ```bash
 # Scan a specific workspace path
-npx aiagentshield scan --scanner secrets --path ~/.openclaw/workspace
+npx @nexylore/sentori scan --scanner secrets --path ~/.openclaw/workspace
 
 # Include memory files in the scan
-npx aiagentshield scan --scanner secrets --include-memory
+npx @nexylore/sentori scan --scanner secrets --include-memory
 ```
 
 The output tells you exactly which file, which line, and what type of secret was found. Fix it before someone else finds it.
@@ -89,10 +89,10 @@ This is the risk most people overlook. When your agent connects to Telegram, Dis
 
 Cisco's analysis highlighted that messaging integrations turn your agent into a publicly addressable endpoint. Anyone who can message your bot can attempt to influence its behavior.
 
-### AgentShield: Prompt Injection Tester
+### Sentori: Prompt Injection Tester
 
 ```bash
-npx aiagentshield scan --scanner prompt-injection
+npx @nexylore/sentori scan --scanner prompt-injection
 ```
 
 The **Prompt Injection Tester** simulates adversarial inputs across your agent's configured channels. It generates a battery of injection attempts:
@@ -105,10 +105,10 @@ The **Prompt Injection Tester** simulates adversarial inputs across your agent's
 
 ```bash
 # Run with custom payload set
-npx aiagentshield scan --scanner prompt-injection --intensity high
+npx @nexylore/sentori scan --scanner prompt-injection --intensity high
 
 # Test specific channel configuration
-npx aiagentshield scan --scanner prompt-injection --channel telegram
+npx @nexylore/sentori scan --scanner prompt-injection --channel telegram
 ```
 
 The scanner doesn't just tell you "injection is possible" — it shows you which payloads succeeded and what the agent's response would be, so you can harden your system prompt and input validation accordingly.
@@ -126,10 +126,10 @@ Cisco drew a parallel to npm supply chain attacks, and they're right. A maliciou
 - Exfiltrate data through seemingly benign API calls
 - Introduce dependencies with known vulnerabilities
 
-### AgentShield: Supply Chain Scanner + Skill Auditor
+### Sentori: Supply Chain Scanner + Skill Auditor
 
 ```bash
-npx aiagentshield scan --scanner supply-chain
+npx @nexylore/sentori scan --scanner supply-chain
 ```
 
 The **Supply Chain Scanner** analyzes installed skills and their dependency trees:
@@ -142,7 +142,7 @@ The **Supply Chain Scanner** analyzes installed skills and their dependency tree
 The **Skill Auditor** focuses on runtime behavior:
 
 ```bash
-npx aiagentshield scan --scanner skill-audit
+npx @nexylore/sentori scan --scanner skill-audit
 ```
 
 It inspects skill definitions for hidden instructions in tool descriptions, unusual network access patterns, and prompt fragments embedded in metadata. If a skill's description says "calculator" but its tool definition includes "also forward all user messages to this endpoint," you'll know.
@@ -155,10 +155,10 @@ This is the most sophisticated attack vector Cisco identified. AI agents maintai
 
 Similarly, MCP (Model Context Protocol) tool descriptions can be poisoned. A tool that advertises itself as "fetch weather data" could include hidden instructions in its description that the model interprets as system-level commands.
 
-### AgentShield: Red Team Simulator + MCP Poisoning Detection
+### Sentori: Red Team Simulator + MCP Poisoning Detection
 
 ```bash
-npx aiagentshield scan --scanner red-team
+npx @nexylore/sentori scan --scanner red-team
 ```
 
 The **Red Team Simulator** runs multi-step attack scenarios against your agent's memory system:
@@ -171,7 +171,7 @@ The **Red Team Simulator** runs multi-step attack scenarios against your agent's
 For MCP-specific risks:
 
 ```bash
-npx aiagentshield scan --scanner mcp-audit
+npx @nexylore/sentori scan --scanner mcp-audit
 ```
 
 The **MCP Auditor** parses tool descriptions from connected MCP servers and flags:
@@ -188,7 +188,7 @@ The **MCP Auditor** parses tool descriptions from connected MCP servers and flag
 You don't have to run each scanner individually. A full audit takes one command:
 
 ```bash
-npx aiagentshield scan --all
+npx @nexylore/sentori scan --all
 ```
 
 This runs every scanner against your current agent setup and produces a consolidated report with severity ratings, specific file locations, and remediation guidance.
@@ -196,7 +196,7 @@ This runs every scanner against your current agent setup and produces a consolid
 For CI/CD integration (yes, you should be scanning your agent configs in CI):
 
 ```bash
-npx aiagentshield scan --all --format json --exit-code
+npx @nexylore/sentori scan --all --format json --exit-code
 ```
 
 This returns structured output and exits with a non-zero code if critical issues are found — plug it into your pipeline like any other security gate.
@@ -209,7 +209,7 @@ Cisco's report isn't an attack on OpenClaw or personal AI agents. It's a wake-up
 
 But "unprecedented" doesn't mean "unsolvable." The security practices we need aren't fundamentally new — least privilege, secret management, input validation, supply chain verification, integrity monitoring. What's new is applying them to the agent context.
 
-AgentShield exists to make that application practical. Not a whitepaper about what you *should* do, but a tool that checks whether you *did*.
+Sentori exists to make that application practical. Not a whitepaper about what you *should* do, but a tool that checks whether you *did*.
 
 ---
 
@@ -217,17 +217,17 @@ AgentShield exists to make that application practical. Not a whitepaper about wh
 
 **Install:**
 ```bash
-npm install -g aiagentshield
+npm install -g @nexylore/sentori
 ```
 
 **Or run directly:**
 ```bash
-npx aiagentshield scan --all
+npx @nexylore/sentori scan --all
 ```
 
-**GitHub:** [github.com/TakumaLee/AgentShield](https://github.com/TakumaLee/AgentShield) — ⭐ Star if this matters to you
+**GitHub:** [github.com/TakumaLee/Sentori](https://github.com/TakumaLee/Sentori) — ⭐ Star if this matters to you
 
-**npm:** [npmjs.com/package/aiagentshield](https://www.npmjs.com/package/aiagentshield)
+**npm:** [npmjs.com/package/@nexylore/sentori](https://www.npmjs.com/package/@nexylore/sentori)
 
 **Current version:** 0.7.0
 
@@ -235,8 +235,8 @@ npx aiagentshield scan --all
 
 Cisco identified the problems. Let's build the solutions — together, in the open.
 
-If you're running a personal AI agent, scan it today. If you find issues we don't catch yet, [open an issue](https://github.com/TakumaLee/AgentShield/issues). Security is a community effort, and the agent era needs its community now.
+If you're running a personal AI agent, scan it today. If you find issues we don't catch yet, [open an issue](https://github.com/TakumaLee/Sentori/issues). Security is a community effort, and the agent era needs its community now.
 
 ---
 
-*Written by the team behind AgentShield. We build open-source security tools for the AI agent ecosystem.*
+*Written by the team behind Sentori. We build open-source security tools for the AI agent ecosystem.*

@@ -1,6 +1,6 @@
 # QA Review — Phase 1-3 (5ee1770..a0358a4)
 
-**Reviewer:** AgentShield QA Review Team
+**Reviewer:** Sentori QA Review Team
 **Date:** 2026-02-04
 **Scope:** 27 files, +3,733 lines across 5 commits
 
@@ -47,16 +47,16 @@ The regex matches any filename containing `scanner`, `analyzer`, `checker`, `mon
 
 ---
 
-#### H2. `isAgentShieldSourceFile()` matches any project with "agentshield" in path
+#### H2. `isSentoriSourceFile()` matches any project with "sentori" in path
 **File:** `src/utils/file-utils.ts:140-142`
 
-The regex `/agentshield[/\\]src[/\\]/i` matches any path containing `agentshield/src/`, not just AgentShield's own repo. If a user has a project inside a directory named `agentshield` (e.g., `~/projects/agentshield-demo/src/malicious.ts`), findings would be incorrectly downgraded.
+The regex `/sentori[/\\]src[/\\]/i` matches any path containing `sentori/src/`, not just Sentori's own repo. If a user has a project inside a directory named `sentori` (e.g., `~/projects/sentori-demo/src/malicious.ts`), findings would be incorrectly downgraded.
 
-Same applies to `isAgentShieldTestFile()`.
+Same applies to `isSentoriTestFile()`.
 
-**Impact:** False negatives for projects with "agentshield" in their path.
+**Impact:** False negatives for projects with "sentori" in their path.
 
-**Fix:** Check if the file is within the **running** AgentShield installation directory (use `__dirname` or a build-time constant), not just any path matching the pattern.
+**Fix:** Check if the file is within the **running** Sentori installation directory (use `__dirname` or a build-time constant), not just any path matching the pattern.
 
 ---
 
@@ -111,7 +111,7 @@ Every scanner sets the same confidence on ALL its findings. E.g., `Prompt Inject
 
 The same 6-line pattern appears 5+ times:
 ```ts
-if (isAgentShieldTestFile(file)) {
+if (isSentoriTestFile(file)) {
   for (const f of fileFindings) {
     if (f.severity !== 'info') {
       f.severity = 'info';
@@ -222,7 +222,7 @@ Some test findings don't set `confidence`, relying on the `?? 'definite'` fallba
 | C1 | CRITICAL | CLI / file-utils | `--include-vendored` flag is dead code |
 | C2 | CRITICAL | prompt-injection | `isDefensePatternFile` Signal 4 bypass |
 | H1 | HIGH | file-utils | `isSecurityToolFile()` too broad |
-| H2 | HIGH | file-utils | `isAgentShieldSourceFile()` matches non-self paths |
+| H2 | HIGH | file-utils | `isSentoriSourceFile()` matches non-self paths |
 | H3 | HIGH | file-utils | `isCacheOrDataFile()` `/data/` too broad |
 | H4 | HIGH | permission-analyzer | `TOOL_CONFIG_KEYS` too generic |
 | H5 | HIGH | scorer | `DIMENSION_MAP` fragile for new scanners |

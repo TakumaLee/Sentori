@@ -1,4 +1,4 @@
-# AgentShield — PRD
+# Sentori — PRD
 
 ## 概述
 AI Agent / MCP Server 安全掃描 CLI 工具——20 個 Scanner 偵測 prompt injection、供應鏈中毒、密鑰洩漏、設定風險，可整合至 CI/CD。
@@ -11,7 +11,7 @@ AI Agent / MCP Server 安全掃描 CLI 工具——20 個 Scanner 偵測 prompt 
 
 ## 核心功能
 ### 必備功能（Must Have）
-- [x] CLI 介面 — `npx aiagentshield ./path/to/agent` 一行掃描 ✅
+- [x] CLI 介面 — `npx @nexylore/sentori ./path/to/agent` 一行掃描 ✅
 - [x] Supply Chain Scanner — 6 規則偵測供應鏈中毒（Base64 隱藏指令/RCE/IOC/憑證竊取/資料外洩/持久化機制）✅
 - [x] Convention Squatting Scanner — typosquatting/前綴劫持/命名衝突攻擊偵測 ✅
 - [x] DXT Security Scanner — Claude Desktop Extension 設定安全審計（10 規則，CRITICAL~MEDIUM）✅
@@ -34,14 +34,14 @@ AI Agent / MCP Server 安全掃描 CLI 工具——20 個 Scanner 偵測 prompt 
 - [x] Visual Prompt Injection Scanner — 視覺提示注入掃描（tesseract.js OCR）✅
 - [x] IOC Blocklist — 外部 IOC 封鎖清單支援（自訂 JSON）✅
 - [x] CI/CD 整合 — GitHub Actions `action.yml` 支援 ✅
-- [x] NPM 套件發布 — `aiagentshield`（v0.7.0）✅
+- [x] NPM 套件發布 — `@nexylore/sentori`（v0.7.0）✅
 
 ### 進階功能（Nice to Have）
-- [ ] Web Dashboard — 掃描結果視覺化（agentshield-web 負責）
+- [ ] Web Dashboard — 掃描結果視覺化（sentori-web 負責）
 - [ ] SARIF 輸出 — 標準安全報告格式（GitHub Code Scanning 整合）
 - [ ] VS Code Extension — 編輯器內即時掃描
 - [ ] 自訂規則 — YAML 定義自訂 Scanner 規則
-- [ ] API 模式 — REST API 供 agentshield-web 呼叫
+- [ ] API 模式 — REST API 供 sentori-web 呼叫
 
 ## 技術架構
 - Node.js / TypeScript
@@ -55,13 +55,13 @@ AI Agent / MCP Server 安全掃描 CLI 工具——20 個 Scanner 偵測 prompt 
 ## API 設計（CLI）
 ```bash
 # 基本掃描
-npx aiagentshield ./path/to/agent
+npx @nexylore/sentori ./path/to/agent
 
 # 自訂 IOC 封鎖清單
-npx aiagentshield ./path/to/agent ./custom-ioc-blocklist.json
+npx @nexylore/sentori ./path/to/agent ./custom-ioc-blocklist.json
 
 # 輸出格式（未來）
-npx aiagentshield ./path/to/agent --output json --output-file result.json
+npx @nexylore/sentori ./path/to/agent --output json --output-file result.json
 ```
 
 **輸出格式：**
@@ -69,8 +69,8 @@ npx aiagentshield ./path/to/agent --output json --output-file result.json
 - `ScanResult`：`{ scanner, findings[], score, timestamp }`
 
 ## 上架/變現計畫
-- 平台：npm (`aiagentshield`) + GitHub 開源
-- 定價：CLI 免費開源 / 雲端 Dashboard（agentshield-web）付費
+- 平台：npm (`@nexylore/sentori`) + GitHub 開源
+- 定價：CLI 免費開源 / 雲端 Dashboard（sentori-web）付費
 - 目前狀態：v0.7.0 已發布 npm，持續迭代 Scanner
 
 ## 競品
@@ -82,7 +82,7 @@ npx aiagentshield ./path/to/agent --output json --output-file result.json
 ## 成功指標
 - npm 週下載量 10,000
 - GitHub Stars 1,000
-- agentshield-web 付費轉換率（配合 SaaS 版）
+- sentori-web 付費轉換率（配合 SaaS 版）
 
 ## 測試計畫
 | 類型 | 工具 | 涵蓋範圍 |
@@ -95,8 +95,8 @@ npx aiagentshield ./path/to/agent --output json --output-file result.json
 ## 部署方案
 | 服務 | 平台 | 說明 |
 |------|------|------|
-| npm 套件 | npmjs.com | `aiagentshield`，`npm publish` 發布 |
-| GitHub Actions | github.com/TakumaLee/AgentShield | `action.yml` CI 整合 |
+| npm 套件 | npmjs.com | `@nexylore/sentori`，`npm publish` 發布 |
+| GitHub Actions | github.com/TakumaLee/Sentori | `action.yml` CI 整合 |
 | Demo | `demo-vulnerable-agent/` | 展示用漏洞 Agent |
 
 **發布流程**：`npm run build` → `npm run prepublishOnly` → `npm publish`  

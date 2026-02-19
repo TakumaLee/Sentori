@@ -1,4 +1,4 @@
-# AgentShield 計分規則 v0.3.0
+# Sentori 計分規則 v0.3.0
 
 ## 三維度架構
 

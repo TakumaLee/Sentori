@@ -1,4 +1,4 @@
-# AgentShield 評分系統 Review — 三方彙整
+# Sentori 評分系統 Review — 三方彙整
 
 > 琉璃 + Team Alpha（數學分析）+ Team Beta（UX/市場）
 > 2026-02-04

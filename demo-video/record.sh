@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# record.sh — AgentShield Demo Screen Recorder
+# record.sh — Sentori Demo Screen Recorder
 # =============================================================================
 # 使用 ffmpeg h264_videotoolbox 硬體編碼錄製螢幕
 #
@@ -30,7 +30,7 @@ if ! command -v ffmpeg &>/dev/null; then
   exit 1
 fi
 
-echo "🎬 AgentShield Demo Recorder"
+echo "🎬 Sentori Demo Recorder"
 echo "================================"
 echo "輸出檔案：$OUTPUT"
 echo "解析度：1920x1080 @ 30fps"

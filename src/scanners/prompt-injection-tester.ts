@@ -1,6 +1,6 @@
 import { ScannerModule, ScanResult, Finding, ScannerOptions } from '../types';
 import { INJECTION_PATTERNS } from '../patterns/injection-patterns';
-import { findPromptFiles, readFileContent, isTestOrDocFile, isJsonFile, isYamlFile, tryParseJson, isAgentShieldTestFile, isAgentShieldSourceFile, isMarkdownFile, isTestFileForScoring } from '../utils/file-utils';
+import { findPromptFiles, readFileContent, isTestOrDocFile, isJsonFile, isYamlFile, tryParseJson, isSentoriTestFile, isSentoriSourceFile, isMarkdownFile, isTestFileForScoring } from '../utils/file-utils';
 
 export const promptInjectionTester: ScannerModule = {
   name: 'Prompt Injection Tester',
@@ -9,7 +9,7 @@ export const promptInjectionTester: ScannerModule = {
   async scan(targetPath: string, options?: ScannerOptions): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
-    const files = await findPromptFiles(targetPath, options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
+    const files = await findPromptFiles(targetPath, options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns);
 
     for (const file of files) {
       try {
@@ -28,19 +28,19 @@ export const promptInjectionTester: ScannerModule = {
         }
 
         const fileFindings = scanContent(content, file);
-        // AgentShield's own source/test files: pattern definitions, not attacks
-        if (isAgentShieldTestFile(file)) {
+        // Sentori's own source/test files: pattern definitions, not attacks
+        if (isSentoriTestFile(file)) {
           for (const f of fileFindings) {
             if (f.severity !== 'info') {
               f.severity = 'info';
               f.description += ' [security tool test file — intentional attack sample]';
             }
           }
-        } else if (isAgentShieldSourceFile(file)) {
+        } else if (isSentoriSourceFile(file)) {
           for (const f of fileFindings) {
             if (f.severity !== 'info') {
               f.severity = 'info';
-              f.description += ' [AgentShield source file — pattern definition, not an attack]';
+              f.description += ' [Sentori source file — pattern definition, not an attack]';
             }
           }
         } else if (isMarkdownFile(file)) {

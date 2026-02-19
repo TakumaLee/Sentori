@@ -192,7 +192,7 @@ export const openclawConfigAuditor: ScannerModule = {
     const findings: Finding[] = [];
 
     // 1. Collect files to scan from the target path
-    const allFiles = await findConfigFiles(targetPath, options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
+    const allFiles = await findConfigFiles(targetPath, options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns);
 
     const configFiles = allFiles.filter(f => isOpenClawConfigFile(f));
     const cronFiles = allFiles.filter(f => isOpenClawCronFile(f));

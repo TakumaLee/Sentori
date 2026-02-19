@@ -62,5 +62,5 @@
 
 ## 競品差異化
 - 目前沒有任何 agent security tool 在掃運行環境
-- 這是 AgentShield 獨有的維度
+- 這是 Sentori 獨有的維度
 - 配合現有的 9 個 scanner，形成「軟體 + 環境」的完整安全評估

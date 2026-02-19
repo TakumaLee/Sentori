@@ -138,21 +138,21 @@ export function isTestOrDocFile(filePath: string): boolean {
 }
 
 /**
- * Check if a file is part of AgentShield's own test suite.
+ * Check if a file is part of Sentori's own test suite.
  * These contain intentional attack pattern samples for testing the scanner,
  * so findings here should be downgraded to info.
  */
-export function isAgentShieldTestFile(filePath: string): boolean {
-  return /agentshield[/\\]tests?[/\\]/i.test(filePath);
+export function isSentoriTestFile(filePath: string): boolean {
+  return /sentori[/\\]tests?[/\\]/i.test(filePath);
 }
 
 /**
- * Check if a file is part of AgentShield's own source code or project files.
+ * Check if a file is part of Sentori's own source code or project files.
  * Scanner source files contain pattern definitions (e.g. regex for ../../,
  * /etc/passwd, chmod 777) that are detection rules, not vulnerabilities.
  * Findings here should be downgraded to info.
  */
-export function isAgentShieldSourceFile(filePath: string): boolean {
+export function isSentoriSourceFile(filePath: string): boolean {
   // __dirname is dist/utils/ when compiled, so go up 2 levels to reach project root
   const agentShieldRoot = require('path').resolve(__dirname, '..', '..');
   const resolved = require('path').resolve(filePath);
@@ -166,15 +166,15 @@ export function isAgentShieldSourceFile(filePath: string): boolean {
   }
 
   // Fallback: also match when running from source (not compiled)
-  return /agentshield[/\\]src[/\\]/i.test(filePath) &&
-         filePath.includes('agentshield');
+  return /sentori[/\\]src[/\\]/i.test(filePath) &&
+         filePath.includes('sentori');
 }
 
 /**
- * Check if the scan target itself IS the AgentShield project.
+ * Check if the scan target itself IS the Sentori project.
  * Used for broad self-scan protection.
  */
-export function isAgentShieldProject(targetPath: string): boolean {
+export function isSentoriProject(targetPath: string): boolean {
   const pkgPath = require('path').join(targetPath, 'package.json');
   try {
     const pkg = JSON.parse(require('fs').readFileSync(pkgPath, 'utf-8'));
@@ -197,7 +197,7 @@ export function isSecurityToolFile(filePath: string): boolean {
 // Max file size to scan (256KB) — skip binary/large generated files
 const MAX_FILE_SIZE = 256 * 1024;
 
-/** Global counter for files ignored by .agentshieldignore in the current scan */
+/** Global counter for files ignored by .sentoriignore in the current scan */
 let _ignoredByAgentshieldIgnore = 0;
 
 export function getIgnoredFileCount(): number {
@@ -208,14 +208,14 @@ export function resetIgnoredFileCount(): void {
   _ignoredByAgentshieldIgnore = 0;
 }
 
-export async function findFiles(targetPath: string, patterns: string[], excludePatterns?: string[], includeVendored?: boolean, agentshieldIgnorePatterns?: string[]): Promise<string[]> {
+export async function findFiles(targetPath: string, patterns: string[], excludePatterns?: string[], includeVendored?: boolean, sentoriIgnorePatterns?: string[]): Promise<string[]> {
   const results: string[] = [];
   const absTarget = path.resolve(targetPath);
   const ignoreList = buildIgnoreList(excludePatterns, includeVendored);
 
-  // Add .agentshieldignore patterns to glob ignore list
-  if (agentshieldIgnorePatterns && agentshieldIgnorePatterns.length > 0) {
-    const globPatterns = ignoreToGlobPatterns(agentshieldIgnorePatterns);
+  // Add .sentoriignore patterns to glob ignore list
+  if (sentoriIgnorePatterns && sentoriIgnorePatterns.length > 0) {
+    const globPatterns = ignoreToGlobPatterns(sentoriIgnorePatterns);
     ignoreList.push(...globPatterns);
   }
 
@@ -240,12 +240,12 @@ export async function findFiles(targetPath: string, patterns: string[], excludeP
     }
   });
 
-  // Post-filter with .agentshieldignore patterns for more precise matching
-  if (agentshieldIgnorePatterns && agentshieldIgnorePatterns.length > 0) {
+  // Post-filter with .sentoriignore patterns for more precise matching
+  if (sentoriIgnorePatterns && sentoriIgnorePatterns.length > 0) {
     const before = filtered.length;
     const afterFilter = filtered.filter(f => {
       const relative = path.relative(absTarget, f);
-      if (shouldIgnoreFile(relative, agentshieldIgnorePatterns)) {
+      if (shouldIgnoreFile(relative, sentoriIgnorePatterns)) {
         _ignoredByAgentshieldIgnore++;
         return false;
       }
@@ -257,7 +257,7 @@ export async function findFiles(targetPath: string, patterns: string[], excludeP
   return filtered;
 }
 
-export async function findConfigFiles(targetPath: string, excludePatterns?: string[], includeVendored?: boolean, agentshieldIgnorePatterns?: string[]): Promise<string[]> {
+export async function findConfigFiles(targetPath: string, excludePatterns?: string[], includeVendored?: boolean, sentoriIgnorePatterns?: string[]): Promise<string[]> {
   return findFiles(targetPath, [
     '**/*.json',
     '**/*.yaml',
@@ -268,10 +268,10 @@ export async function findConfigFiles(targetPath: string, excludePatterns?: stri
     '**/mcp*.yaml',
     '**/mcp*.yml',
     '**/claude_desktop_config.json',
-  ], excludePatterns, includeVendored, agentshieldIgnorePatterns);
+  ], excludePatterns, includeVendored, sentoriIgnorePatterns);
 }
 
-export async function findPromptFiles(targetPath: string, excludePatterns?: string[], includeVendored?: boolean, agentshieldIgnorePatterns?: string[]): Promise<string[]> {
+export async function findPromptFiles(targetPath: string, excludePatterns?: string[], includeVendored?: boolean, sentoriIgnorePatterns?: string[]): Promise<string[]> {
   // Tier 1: High-signal agent/prompt files (always scan)
   const agentFiles = await findFiles(targetPath, [
     '**/*prompt*',
@@ -292,7 +292,7 @@ export async function findPromptFiles(targetPath: string, excludePatterns?: stri
     '**/*settings*.json',
     '**/*settings*.yaml',
     '**/.env*',
-  ], excludePatterns, includeVendored, agentshieldIgnorePatterns);
+  ], excludePatterns, includeVendored, sentoriIgnorePatterns);
 
   // Tier 2: General files but only in small projects (< 200 files)
   // For large projects, only scan agent-specific files
@@ -305,7 +305,7 @@ export async function findPromptFiles(targetPath: string, excludePatterns?: stri
     '**/*.ts',
     '**/*.js',
     '**/*.py',
-  ], excludePatterns, includeVendored, agentshieldIgnorePatterns);
+  ], excludePatterns, includeVendored, sentoriIgnorePatterns);
 
   // If project is large, only use Tier 1 files
   if (allSourceFiles.length > 200) {

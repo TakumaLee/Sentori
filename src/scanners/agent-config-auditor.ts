@@ -39,7 +39,7 @@ export const agentConfigAuditor: ScannerModule = {
   async scan(targetPath: string, options?: ScannerOptions): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
-    const files = await findConfigFiles(targetPath, options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
+    const files = await findConfigFiles(targetPath, options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns);
 
     // Filter to agent config files only
     const configFiles = files.filter(f => isAgentConfigFile(f));

@@ -1,4 +1,4 @@
-# AgentShield 評分系統 Review — 琉璃
+# Sentori 評分系統 Review — 琉璃
 
 ## 一、現有架構總覽
 

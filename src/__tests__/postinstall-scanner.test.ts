@@ -4,7 +4,7 @@ import * as os from 'os';
 import { PostinstallScanner } from '../scanners/postinstall-scanner';
 
 function createTempProject(packages: Record<string, any>): string {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentshield-postinstall-test-'));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentori-postinstall-test-'));
   const nodeModules = path.join(tmpDir, 'node_modules');
   fs.mkdirSync(nodeModules, { recursive: true });
 
@@ -36,7 +36,7 @@ function cleanup(dir: string): void {
 describe('PostinstallScanner', () => {
   describe('Basic functionality', () => {
     test('detects missing node_modules', async () => {
-      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentshield-no-modules-'));
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentori-no-modules-'));
       const scanner = new PostinstallScanner();
       
       try {
@@ -351,7 +351,7 @@ describe('PostinstallScanner', () => {
 
   describe('Depth configuration', () => {
     test('respects depth=1 configuration', async () => {
-      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentshield-depth-test-'));
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentori-depth-test-'));
       const nodeModules = path.join(tmpDir, 'node_modules');
       
       // Create a package with nested dependencies
@@ -390,7 +390,7 @@ describe('PostinstallScanner', () => {
     });
 
     test('scans all levels with depth=-1', async () => {
-      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentshield-unlimited-test-'));
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentori-unlimited-test-'));
       const nodeModules = path.join(tmpDir, 'node_modules');
       
       // Create a package with nested dependencies

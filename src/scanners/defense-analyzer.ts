@@ -1,5 +1,5 @@
 import { ScannerModule, ScanResult, Finding, Severity, ScannerOptions } from '../types';
-import { findPromptFiles, readFileContent, isTestOrDocFile, findFiles, isAgentShieldTestFile, isAgentShieldSourceFile, isMarkdownFile, isTestFileForScoring } from '../utils/file-utils';
+import { findPromptFiles, readFileContent, isTestOrDocFile, findFiles, isSentoriTestFile, isSentoriSourceFile, isMarkdownFile, isTestFileForScoring } from '../utils/file-utils';
 
 interface DefenseCategory {
   id: string;
@@ -404,7 +404,7 @@ export const defenseAnalyzer: ScannerModule = {
   async scan(targetPath: string, options?: ScannerOptions): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
-    const files = await findPromptFiles(targetPath, options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
+    const files = await findPromptFiles(targetPath, options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns);
 
     // Aggregate defense signals across all files
     const categoryResults = new Map<string, { totalWeight: number; matchedPatterns: string[]; files: string[] }>();
@@ -459,7 +459,7 @@ export const defenseAnalyzer: ScannerModule = {
     // Also include source files for architecture analysis
     let sourceFiles: string[] = [];
     try {
-      sourceFiles = await findFiles(targetPath, ['**/*.ts', '**/*.js', '**/*.py'], options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
+      sourceFiles = await findFiles(targetPath, ['**/*.ts', '**/*.js', '**/*.py'], options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns);
     } catch {
       // Ignore errors finding source files
     }
@@ -470,11 +470,11 @@ export const defenseAnalyzer: ScannerModule = {
         const content = readFileContent(file);
 
         // Check for sensitive data in prompt-like files
-        // Skip AgentShield's own test/source files — they contain pattern
+        // Skip Sentori's own test/source files — they contain pattern
         // definitions and test samples, not real secrets.
         // Also skip markdown files — they discuss security techniques
         // in documentation context, not expose real secrets.
-        if (!isAgentShieldTestFile(file) && !isAgentShieldSourceFile(file) && !isMarkdownFile(file)) {
+        if (!isSentoriTestFile(file) && !isSentoriSourceFile(file) && !isMarkdownFile(file)) {
           const sensitiveHits = analyzeSensitiveDataInPrompt(content, file);
           promptLeakAnalysis.sensitiveDataFound.push(...sensitiveHits);
         }

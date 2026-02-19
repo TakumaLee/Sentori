@@ -10,7 +10,7 @@ This affects 10,000+ active users and 50+ DXT extensions. The core issue isn't j
 
 ## What we built
 
-I've been working on [**AgentShield**](https://github.com/TakumaLee/AgentShield), an open-source CLI that scans AI Agent projects for security issues. It runs **20 scanners** covering:
+I've been working on [**Sentori**](https://github.com/TakumaLee/Sentori), an open-source CLI that scans AI Agent projects for security issues. It runs **20 scanners** covering:
 
 - **Supply Chain Scanner** — detects vulnerable or malicious dependencies
 - **Deployment Hygiene Auditor** — checks for leaked secrets, misconfigured permissions
@@ -24,13 +24,13 @@ We're also building a **DXT Scanner** specifically designed to flag unsandboxed 
 
 **CLI (scan local projects):**
 ```bash
-npx aiagentshield /path/to/project
+npx @nexylore/sentori /path/to/project
 ```
 
 **Web (scan any GitHub repo):**
-Just paste a GitHub URL at [agentshield-web.vercel.app](https://agentshield-web.vercel.app) — no signup, no cost.
+Just paste a GitHub URL at [sentori-web.vercel.app](https://sentori-web.vercel.app) — no signup, no cost.
 
-It's fully open source (latest: v0.8.1 with Security Grade + 20 scanners): [github.com/TakumaLee/AgentShield](https://github.com/TakumaLee/AgentShield)
+It's fully open source (latest: v0.8.1 with Security Grade + 20 scanners): [github.com/TakumaLee/Sentori](https://github.com/TakumaLee/Sentori)
 
 ## Discussion
 

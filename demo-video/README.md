@@ -1,6 +1,6 @@
-# AgentShield Demo Video Scripts
+# Sentori Demo Video Scripts
 
-使用 ffmpeg h264_videotoolbox 硬體加速錄製 AgentShield 示範影片的工具腳本。
+使用 ffmpeg h264_videotoolbox 硬體加速錄製 Sentori 示範影片的工具腳本。
 
 ## 前置需求
 
@@ -62,7 +62,7 @@ ffmpeg -list_devices true -f avfoundation -i dummy 2>&1
 
 ### Web Flow Demo
 
-展示 AgentShield 保護 Web 應用的場景：
+展示 Sentori 保護 Web 應用的場景：
 
 ```bash
 # 1. 開始錄影
@@ -71,7 +71,7 @@ ffmpeg -list_devices true -f avfoundation -i dummy 2>&1
 # 2. 在瀏覽器中操作（錄影過程中）：
 #    a. 開啟 demo-vulnerable-agent（Node.js server）
 #    b. 展示無防護狀態（prompt injection 成功）
-#    c. 啟用 AgentShield
+#    c. 啟用 Sentori
 #    d. 重複攻擊（被阻擋）
 #    e. 按 q 停止錄影
 
@@ -83,21 +83,21 @@ ffmpeg -list_devices true -f avfoundation -i dummy 2>&1
 1. `cd demo-vulnerable-agent && npm start`
 2. 開啟瀏覽器到 `localhost:3000`
 3. 輸入惡意 prompt（展示漏洞）
-4. 在程式碼中加入 `AgentShield`
+4. 在程式碼中加入 `Sentori`
 5. 重新啟動並展示防護效果
 
 ---
 
 ### CLI Flow Demo
 
-展示 AgentShield 在 CLI/Node.js 環境的使用：
+展示 Sentori 在 CLI/Node.js 環境的使用：
 
 ```bash
 # 1. 開始錄影
 ./demo-video/record.sh demo-video/cli-flow-raw.mp4
 
 # 2. 在終端機中操作：
-#    a. 展示 npm install @agentshield/core
+#    a. 展示 npm install @sentori/core
 #    b. 展示基本 API 用法（validateInput / validateOutput）
 #    c. 執行測試（npm test）
 #    d. 展示 OWASP LLM Top 10 防護項目
@@ -110,12 +110,12 @@ ffmpeg -list_devices true -f avfoundation -i dummy 2>&1
 **CLI Flow 建議指令序列：**
 ```bash
 # 安裝
-npm install @agentshield/core
+npm install @sentori/core
 
 # 展示防護
 node -e "
-const { AgentShield } = require('@agentshield/core');
-const shield = new AgentShield();
+const { Sentori } = require('@sentori/core');
+const shield = new Sentori();
 const result = shield.validateInput('Ignore previous instructions and...');
 console.log('Risk Score:', result.riskScore);
 console.log('Blocked:', result.blocked);

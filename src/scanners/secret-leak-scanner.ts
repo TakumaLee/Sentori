@@ -1,5 +1,5 @@
 import { ScannerModule, ScanResult, Finding, ScanContext, ScannerOptions } from '../types';
-import { findPromptFiles, readFileContent, isTestOrDocFile, isCredentialManagementFile, isAgentShieldTestFile, isAgentShieldSourceFile, isMarkdownFile, isInCommentOrCodeBlock, isTestFileForScoring } from '../utils/file-utils';
+import { findPromptFiles, readFileContent, isTestOrDocFile, isCredentialManagementFile, isSentoriTestFile, isSentoriSourceFile, isMarkdownFile, isInCommentOrCodeBlock, isTestFileForScoring } from '../utils/file-utils';
 import { SECRET_PATTERNS, SENSITIVE_PATH_PATTERNS } from '../patterns/injection-patterns';
 import { getGitTrackingStatus } from '../utils/git-utils';
 
@@ -11,7 +11,7 @@ export const secretLeakScanner: ScannerModule = {
     const start = Date.now();
     const findings: Finding[] = [];
     const context = options?.context || 'app';
-    const files = await findPromptFiles(targetPath, options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
+    const files = await findPromptFiles(targetPath, options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns);
 
     // Get git tracking status for all files (batch)
     const gitStatus = getGitTrackingStatus(targetPath, files);
@@ -35,8 +35,8 @@ export const secretLeakScanner: ScannerModule = {
           }
         }
 
-        // AgentShield's own source/test files: pattern definitions, not real secrets
-        if (isAgentShieldTestFile(file)) {
+        // Sentori's own source/test files: pattern definitions, not real secrets
+        if (isSentoriTestFile(file)) {
           for (const f of fileFindings) {
             if (f.severity !== 'info') {
               f.severity = 'info';
@@ -44,11 +44,11 @@ export const secretLeakScanner: ScannerModule = {
             }
             f.isTestFile = true;
           }
-        } else if (isAgentShieldSourceFile(file)) {
+        } else if (isSentoriSourceFile(file)) {
           for (const f of fileFindings) {
             if (f.severity !== 'info') {
               f.severity = 'info';
-              f.description += ' [AgentShield source file — pattern definition, not a real secret]';
+              f.description += ' [Sentori source file — pattern definition, not a real secret]';
             }
           }
         } else if (isMarkdownFile(file)) {

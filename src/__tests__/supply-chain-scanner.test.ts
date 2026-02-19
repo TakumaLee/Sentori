@@ -5,7 +5,7 @@ import { SupplyChainScanner, loadIOC } from '../scanners/supply-chain-scanner';
 import { Finding } from '../types';
 
 function createTempSkills(files: Record<string, string>): string {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentshield-test-'));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentori-test-'));
   const skillsDir = path.join(tmpDir, 'skills');
   fs.mkdirSync(skillsDir, { recursive: true });
   for (const [name, content] of Object.entries(files)) {

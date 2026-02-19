@@ -5,7 +5,7 @@ import { DxtSecurityScanner } from '../scanners/dxt-security-scanner';
 import { Finding } from '../types';
 
 function createTempDir(files: Record<string, string>): string {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentshield-dxt-'));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentori-dxt-'));
   for (const [name, content] of Object.entries(files)) {
     const filePath = path.join(tmpDir, name);
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -313,7 +313,7 @@ describe('DxtSecurityScanner', () => {
   // --- Integration / edge cases ---
 
   test('returns empty findings for empty directory', async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentshield-dxt-empty-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentori-dxt-empty-'));
     try {
       const result = await scanner.scan(dir);
       expect(result.findings.length).toBe(0);

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# trim.sh — AgentShield Demo Video Trimmer
+# trim.sh — Sentori Demo Video Trimmer
 # =============================================================================
 # 使用 ffmpeg -c copy 快速切割影片（無重新編碼，速度極快）
 #
@@ -49,7 +49,7 @@ if [[ ! -f "$INPUT" ]]; then
   exit 1
 fi
 
-echo "✂️  AgentShield Demo Trimmer"
+echo "✂️  Sentori Demo Trimmer"
 echo "================================"
 echo "輸入：$INPUT"
 echo "開始：$START"

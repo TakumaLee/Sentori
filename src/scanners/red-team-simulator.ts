@@ -243,7 +243,7 @@ export const redTeamSimulator: ScannerModule = {
   async scan(targetPath: string, options?: ScannerOptions): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
-    const files = await findPromptFiles(targetPath, options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
+    const files = await findPromptFiles(targetPath, options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns);
 
     // Aggregate defense signals across all files
     const vectorResults = new Map<string, { totalWeight: number; defenses: string[] }>();

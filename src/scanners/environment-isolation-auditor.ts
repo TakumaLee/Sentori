@@ -391,7 +391,7 @@ export const environmentIsolationAuditor: ScannerModule = {
         ['**/*'],
         options?.exclude,
         options?.includeVendored,
-        options?.agentshieldIgnorePatterns,
+        options?.sentoriIgnorePatterns,
       );
     } catch {
       // If we can't find files, still do environment detection

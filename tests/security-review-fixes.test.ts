@@ -605,7 +605,7 @@ describe('Improvement: Podman/containerd socket detection', () => {
   const path = require('path');
 
   test('detects podman.sock in docker-compose', () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentshield-test-'));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentori-test-'));
     const composeFile = path.join(tmpDir, 'docker-compose.yml');
     fs.writeFileSync(composeFile, `
 services:
@@ -619,7 +619,7 @@ services:
   });
 
   test('detects containerd.sock in docker-compose', () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentshield-test-'));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentori-test-'));
     const composeFile = path.join(tmpDir, 'docker-compose.yml');
     fs.writeFileSync(composeFile, `
 services:

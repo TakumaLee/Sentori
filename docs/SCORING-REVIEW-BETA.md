@@ -1,4 +1,4 @@
-# AgentShield Scoring Review — Team Beta (UX & Market)
+# Sentori Scoring Review — Team Beta (UX & Market)
 
 > **Reviewer**: Scoring Review Team Beta
 > **Date**: 2026-02-04
@@ -27,7 +27,7 @@ The problem isn't the math — it's the **signal-to-noise ratio at first contact
 
 Traditional security scanners (SAST/DAST) scan code developers wrote. If Semgrep flags SQL injection, developers accept it because they know they wrote that query.
 
-AgentShield is different — Red Team and Defense Analyzer findings are **inferential**. They say "you MIGHT be vulnerable because we didn't find defense pattern X." Developers who implemented defenses in code (not in prompts) see these as false accusations.
+Sentori is different — Red Team and Defense Analyzer findings are **inferential**. They say "you MIGHT be vulnerable because we didn't find defense pattern X." Developers who implemented defenses in code (not in prompts) see these as false accusations.
 
 **Key insight**: Inferential findings feel unfair. Confirmed findings feel helpful. They should not weigh the same.
 
@@ -44,11 +44,11 @@ AgentShield is different — Red Team and Defense Analyzer findings are **infere
 | **npm audit** | Advisory severity (low/moderate/high/critical) | Simple; familiar; matches CVE severity | No aggregate; doesn't distinguish 1 critical from 50 |
 | **Scorecard (OpenSSF)** | 0–10 per check, aggregate 0–10 | Positive framing (higher = better); per-dimension scores | Coarse granularity; hard to act on |
 | **SonarQube** | Letter grades (A–E) per dimension + "Quality Gate" pass/fail | Dimensional clarity; pass/fail is actionable | Complex setup; dimension overload for simple projects |
-| **AgentShield** | Log-diminishing penalty → 0–100 → A+–F | Mathematically elegant; single score | Harsh first impression; no dimensional breakdown; inferential and confirmed findings weighted equally |
+| **Sentori** | Log-diminishing penalty → 0–100 → A+–F | Mathematically elegant; single score | Harsh first impression; no dimensional breakdown; inferential and confirmed findings weighted equally |
 
 ### What We Can Learn
 
-1. **Semgrep/Snyk avoid aggregate scores for a reason** — a single number invites disagreement. But AgentShield's value proposition IS the aggregate posture score for CI/CD gating. We need it, but we need to make it credible.
+1. **Semgrep/Snyk avoid aggregate scores for a reason** — a single number invites disagreement. But Sentori's value proposition IS the aggregate posture score for CI/CD gating. We need it, but we need to make it credible.
 
 2. **SonarQube's dimensional approach** splits code smell / bugs / vulnerabilities / security hotspots. Each dimension gets its own grade. This prevents "my code smells bad so my security grade is F."
 
@@ -56,7 +56,7 @@ AgentShield is different — Red Team and Defense Analyzer findings are **infere
 
 4. **npm audit's simplicity** is its strength. Developers understand "3 high, 1 critical" instantly. No formula to question.
 
-### AgentShield's Competitive Edge (Don't Lose It)
+### Sentori's Competitive Edge (Don't Lose It)
 
 No competitor does AI agent-specific security scanning. The 8-scanner pipeline covering prompt injection, MCP config, red team simulation, channel surface analysis — this is unique. The scoring system should **enhance** this differentiation, not undermine it with "unfair" grades.
 
@@ -64,7 +64,7 @@ No competitor does AI agent-specific security scanning. The 8-scanner pipeline c
 
 ## 3. Inferential vs Confirmed Findings
 
-This is AgentShield's most important architectural distinction and it's currently invisible to users.
+This is Sentori's most important architectural distinction and it's currently invisible to users.
 
 ### Finding Confidence Taxonomy
 
@@ -238,14 +238,14 @@ But depth matters more than breadth. **5 good Japanese patterns > 1 token Japane
 |---|--------|--------|--------|
 | 10 | **Positive framing option** ("Security Posture: 73/100" instead of "-27 penalty") | Better developer psychology | Trivial — cosmetic |
 | 11 | **Unicode normalization pre-processing** | Catches homoglyph and zero-width attacks | Medium |
-| 12 | **Historical score tracking** (`agentshield history`) | Developers see improvement over time | Large |
+| 12 | **Historical score tracking** (`sentori history`) | Developers see improvement over time | Large |
 | 13 | **"Why this grade" explainer in report** | Auto-generated paragraph explaining score composition | Medium |
 
 ---
 
 ## 7. Summary
 
-AgentShield's scoring system is **mathematically sound but experientially rough**. The logarithmic decay and severity caps are good engineering. But the tool needs to earn developer trust on first run, and a single number that mixes confirmed secrets with inferential defense gaps will generate resistance.
+Sentori's scoring system is **mathematically sound but experientially rough**. The logarithmic decay and severity caps are good engineering. But the tool needs to earn developer trust on first run, and a single number that mixes confirmed secrets with inferential defense gaps will generate resistance.
 
 Three changes would most improve adoption:
 

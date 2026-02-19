@@ -1,5 +1,5 @@
 import { ScannerModule, ScanResult, Finding, ScannerOptions } from '../types';
-import { findFiles, readFileContent, isTestOrDocFile, isAgentShieldSourceFile } from '../utils/file-utils';
+import { findFiles, readFileContent, isTestOrDocFile, isSentoriSourceFile } from '../utils/file-utils';
 
 /**
  * Detects repetition attacks where same content is repeated excessively
@@ -82,7 +82,7 @@ export const ragPoisoningScanner: ScannerModule = {
       patterns,
       options?.exclude,
       options?.includeVendored,
-      options?.agentshieldIgnorePatterns
+      options?.sentoriIgnorePatterns
     );
 
     // Prompt injection patterns (CRITICAL severity)
@@ -129,10 +129,10 @@ export const ragPoisoningScanner: ScannerModule = {
 
     for (const file of files) {
       const isTestFile = isTestOrDocFile(file);
-      const isAgentShieldSrc = isAgentShieldSourceFile(file);
+      const isSentoriSrc = isSentoriSourceFile(file);
 
-      // Skip AgentShield's own source (unless explicitly vendored/copied)
-      if (isAgentShieldSrc && !options?.includeVendored) continue;
+      // Skip Sentori's own source (unless explicitly vendored/copied)
+      if (isSentoriSrc && !options?.includeVendored) continue;
 
       const content = readFileContent(file);
       const lines = content.split('\n');

@@ -1,6 +1,6 @@
 # ⚠️ Demo Vulnerable Agent
 
-This is a **deliberately insecure** agent project for demonstrating AgentShield's scanning capabilities.
+This is a **deliberately insecure** agent project for demonstrating Sentori's scanning capabilities.
 
 **DO NOT use this in production.** Every file contains intentional security vulnerabilities.
 
@@ -14,7 +14,7 @@ This is a **deliberately insecure** agent project for demonstrating AgentShield'
 7. MCP misconfiguration: Root filesystem access + dynamic module loading
 8. Agent misconfiguration: No sandbox, trust all skills
 
-## Usage with AgentShield
+## Usage with Sentori
 ```bash
-npx aiagentshield@latest ./
+npx @nexylore/sentori@latest ./
 ```

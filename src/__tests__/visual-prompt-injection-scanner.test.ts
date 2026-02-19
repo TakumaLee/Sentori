@@ -4,7 +4,7 @@ import * as os from 'os';
 import { VisualPromptInjectionScanner } from '../scanners/visual-prompt-injection-scanner';
 
 function createTempProject(files: Record<string, string>): string {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentshield-vpi-test-'));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentori-vpi-test-'));
 
   for (const [filePath, content] of Object.entries(files)) {
     const fullPath = path.join(tmpDir, filePath);

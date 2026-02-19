@@ -1,5 +1,5 @@
 import { ScannerModule, ScanResult, Finding, ScannerOptions } from '../types';
-import { findFiles, readFileContent, isTestOrDocFile, isAgentShieldSourceFile } from '../utils/file-utils';
+import { findFiles, readFileContent, isTestOrDocFile, isSentoriSourceFile } from '../utils/file-utils';
 
 /**
  * DNS/ICMP Tool Scanner
@@ -20,7 +20,7 @@ export const dnsIcmpToolScanner: ScannerModule = {
 
     // Scan TypeScript, JavaScript, Python files
     const patterns = ['**/*.ts', '**/*.js', '**/*.tsx', '**/*.jsx', '**/*.py'];
-    const files = await findFiles(targetPath, patterns, options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
+    const files = await findFiles(targetPath, patterns, options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns);
 
     const DNS_ICMP_TOOLS = ['ping', 'nslookup', 'dig', 'host', 'traceroute', 'tracert'];
     
@@ -47,10 +47,10 @@ export const dnsIcmpToolScanner: ScannerModule = {
 
     for (const file of files) {
       const isTestFile = isTestOrDocFile(file);
-      const isAgentShieldSrc = isAgentShieldSourceFile(file);
+      const isSentoriSrc = isSentoriSourceFile(file);
 
-      // Skip AgentShield's own source (unless explicitly vendored/copied)
-      if (isAgentShieldSrc && !options?.includeVendored) continue;
+      // Skip Sentori's own source (unless explicitly vendored/copied)
+      if (isSentoriSrc && !options?.includeVendored) continue;
 
       const content = readFileContent(file);
       const lines = content.split('\n');

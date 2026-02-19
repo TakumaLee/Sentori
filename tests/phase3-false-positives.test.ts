@@ -5,7 +5,7 @@ import { promptInjectionTester } from '../src/scanners/prompt-injection-tester';
 import { skillAuditor } from '../src/scanners/skill-auditor';
 import { channelSurfaceAuditor } from '../src/scanners/channel-surface-auditor';
 import { generatePromptLeakFindings, PromptLeakAnalysis } from '../src/scanners/defense-analyzer';
-import { isAgentShieldSourceFile, isSecurityToolFile, isTestOrDocFile } from '../src/utils/file-utils';
+import { isSentoriSourceFile, isSecurityToolFile, isTestOrDocFile } from '../src/utils/file-utils';
 
 const TEMP_DIR = path.join(__dirname, '__temp_phase3__');
 
@@ -123,21 +123,21 @@ describe('Fix 1: Permission Analyzer — markdown system-prompt files', () => {
 });
 
 // ============================================================
-// Fix 2: AgentShield source file detection
+// Fix 2: Sentori source file detection
 // ============================================================
-describe('Fix 2: isAgentShieldSourceFile', () => {
-  test('detects agentshield/src/ paths', () => {
-    expect(isAgentShieldSourceFile('/Users/me/agentshield/src/scanners/injection.ts')).toBe(true);
-    expect(isAgentShieldSourceFile('/project/agentshield/src/patterns/patterns.ts')).toBe(true);
+describe('Fix 2: isSentoriSourceFile', () => {
+  test('detects sentori/src/ paths', () => {
+    expect(isSentoriSourceFile('/Users/me/sentori/src/scanners/injection.ts')).toBe(true);
+    expect(isSentoriSourceFile('/project/sentori/src/patterns/patterns.ts')).toBe(true);
   });
 
-  test('does not match non-agentshield src paths', () => {
-    expect(isAgentShieldSourceFile('/project/myapp/src/app.ts')).toBe(false);
-    expect(isAgentShieldSourceFile('/project/src/index.ts')).toBe(false);
+  test('does not match non-sentori src paths', () => {
+    expect(isSentoriSourceFile('/project/myapp/src/app.ts')).toBe(false);
+    expect(isSentoriSourceFile('/project/src/index.ts')).toBe(false);
   });
 
-  test('prompt injection findings in agentshield/src should be info', async () => {
-    const dir = path.join(TEMP_DIR, 'fix2-pi', 'agentshield', 'src');
+  test('prompt injection findings in sentori/src should be info', async () => {
+    const dir = path.join(TEMP_DIR, 'fix2-pi', 'sentori', 'src');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(
       path.join(dir, 'patterns.ts'),
@@ -145,7 +145,7 @@ describe('Fix 2: isAgentShieldSourceFile', () => {
     );
     const result = await promptInjectionTester.scan(path.join(TEMP_DIR, 'fix2-pi'));
     const srcFindings = result.findings.filter(
-      f => f.file && f.file.includes('agentshield') && f.file.includes('src'),
+      f => f.file && f.file.includes('sentori') && f.file.includes('src'),
     );
     for (const f of srcFindings) {
       expect(f.severity).toBe('info');
@@ -154,11 +154,11 @@ describe('Fix 2: isAgentShieldSourceFile', () => {
 });
 
 // ============================================================
-// Fix 3: Skill Auditor — agentshield/src/ downgrade
+// Fix 3: Skill Auditor — sentori/src/ downgrade
 // ============================================================
-describe('Fix 3: Skill Auditor — AgentShield source file downgrade', () => {
-  test('skill auditor findings in agentshield/src should be info', async () => {
-    const dir = path.join(TEMP_DIR, 'fix3-sa', 'agentshield', 'src');
+describe('Fix 3: Skill Auditor — Sentori source file downgrade', () => {
+  test('skill auditor findings in sentori/src should be info', async () => {
+    const dir = path.join(TEMP_DIR, 'fix3-sa', 'sentori', 'src');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(
       path.join(dir, 'scanner.ts'),
@@ -166,7 +166,7 @@ describe('Fix 3: Skill Auditor — AgentShield source file downgrade', () => {
     );
     const result = await skillAuditor.scan(path.join(TEMP_DIR, 'fix3-sa'));
     const srcFindings = result.findings.filter(
-      f => f.file && f.file.includes('agentshield') && f.file.includes('src'),
+      f => f.file && f.file.includes('sentori') && f.file.includes('src'),
     );
     for (const f of srcFindings) {
       expect(f.severity).toBe('info');
@@ -196,7 +196,7 @@ describe('Fix 4: Channel Surface Auditor — code evidence requirements', () => 
 
   test('puppeteer import should still trigger high/medium channel finding', async () => {
     // Use /tmp to avoid tests/ path triggering isTestOrDocFile downgrade
-    const dir = path.join('/tmp', '__agentshield_fix4_puppeteer__');
+    const dir = path.join('/tmp', '__sentori_fix4_puppeteer__');
     fs.mkdirSync(dir, { recursive: true });
     try {
       fs.writeFileSync(
@@ -235,7 +235,7 @@ describe('Fix 4: Channel Surface Auditor — code evidence requirements', () => 
 
   test('discord.js import should trigger non-info finding', async () => {
     // Use /tmp to avoid tests/ path triggering isTestOrDocFile downgrade
-    const dir = path.join('/tmp', '__agentshield_fix4_discord__');
+    const dir = path.join('/tmp', '__sentori_fix4_discord__');
     fs.mkdirSync(dir, { recursive: true });
     try {
       fs.writeFileSync(
@@ -435,7 +435,7 @@ describe('Fix 6: Skill Auditor — security tool file detection', () => {
 
   test('regular file reading credentials should stay critical', async () => {
     // Use /tmp to avoid tests/ path triggering isTestOrDocFile downgrade
-    const dir = path.join('/tmp', '__agentshield_fix6_regular__');
+    const dir = path.join('/tmp', '__sentori_fix6_regular__');
     fs.mkdirSync(dir, { recursive: true });
     try {
       fs.writeFileSync(

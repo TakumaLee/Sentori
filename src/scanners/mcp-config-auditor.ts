@@ -10,7 +10,7 @@ export const mcpConfigAuditor: ScannerModule = {
   async scan(targetPath: string, options?: ScannerOptions): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
-    const files = await findConfigFiles(targetPath, options?.exclude, options?.includeVendored, options?.agentshieldIgnorePatterns);
+    const files = await findConfigFiles(targetPath, options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns);
 
     // Skip package manifests and non-agent config files
     const SKIP_PATTERNS = [
@@ -96,8 +96,92 @@ export function auditConfig(config: Record<string, unknown>, filePath?: string):
   return findings;
 }
 
+// ============================================================
+// CVE-2025-6514: mcp-remote < 0.0.8 SSRF → RCE (CVSS 9.6)
+// ============================================================
+
+/**
+ * Returns true if the semver string represents a version < 0.0.8.
+ * Only handles the 0.0.x range relevant to CVE-2025-6514.
+ */
+function isVulnerableMcpRemoteVersion(version: string): boolean {
+  // Strip any pre-release / build metadata suffixes
+  const clean = version.split(/[-+]/)[0];
+  const parts = clean.split('.').map(p => parseInt(p, 10));
+  if (parts.length < 3 || parts.some(n => isNaN(n))) return false;
+  const [major, minor, patch] = parts;
+  if (major !== 0 || minor !== 0) return false; // only 0.0.x is affected
+  return patch < 8;
+}
+
+/**
+ * Detects mcp-remote usage vulnerable to CVE-2025-6514.
+ * Scans command / args fields of a single McpServerEntry.
+ */
+function detectCVE20256514(serverName: string, server: McpServerEntry, filePath?: string): Finding[] {
+  const findings: Finding[] = [];
+  const command = (server.command || '').trim();
+  const args = ((server.args || []) as unknown[]).filter((a): a is string => typeof a === 'string');
+
+  // Helper to push a critical finding (known vulnerable version)
+  const pushCritical = (version: string) => findings.push({
+    id: `CVE-2025-6514-${serverName}`,
+    scanner: 'mcp-config-auditor',
+    severity: 'critical',
+    rule: 'CVE-2025-6514',
+    title: `Server "${serverName}" uses mcp-remote@${version} — CVSS 9.6 RCE vulnerability (CVE-2025-6514)`,
+    description: `mcp-remote@${version} detected — Versions <0.0.8 do not validate OAuth authorization_endpoint, enabling token hijacking and remote code execution.`,
+    file: filePath,
+    recommendation: 'Upgrade to mcp-remote@0.0.8 or later: npx mcp-remote@latest',
+  });
+
+  // Helper to push a high finding (version unconfirmed)
+  const pushHighUnknown = () => findings.push({
+    id: `CVE-2025-6514-${serverName}-unversioned`,
+    scanner: 'mcp-config-auditor',
+    severity: 'high',
+    rule: 'CVE-2025-6514',
+    title: `Server "${serverName}" uses mcp-remote without explicit version — CVE-2025-6514 risk`,
+    description: 'Cannot confirm mcp-remote version. Versions <0.0.8 do not validate OAuth authorization_endpoint, enabling token hijacking and remote code execution (CVSS 9.6).',
+    file: filePath,
+    recommendation: 'Explicitly pin mcp-remote@0.0.8 or later: npx mcp-remote@0.0.8',
+  });
+
+  // Case 1: command IS mcp-remote (no explicit version possible from command field alone)
+  if (command === 'mcp-remote' || command.endsWith('/mcp-remote') || command.endsWith('\\mcp-remote')) {
+    pushHighUnknown();
+    return findings;
+  }
+
+  // Case 2: npx / bunx / pnpx with mcp-remote in args
+  const LAUNCHERS = ['npx', 'bunx', 'pnpx', 'yarn', 'pnpm'];
+  if (LAUNCHERS.includes(command) || LAUNCHERS.some(l => command.endsWith('/' + l) || command.endsWith('\\' + l))) {
+    for (const arg of args) {
+      // Match "mcp-remote" or "mcp-remote@<version>"
+      const m = arg.match(/^mcp-remote(?:@(.+))?$/);
+      if (!m) continue;
+
+      const version = m[1]; // undefined if no @version
+      if (!version || version === 'latest' || version === '*') {
+        pushHighUnknown();
+      } else if (isVulnerableMcpRemoteVersion(version)) {
+        pushCritical(version);
+      }
+      // version >= 0.0.8 → safe, no finding
+      break; // only process first mcp-remote occurrence
+    }
+  }
+
+  return findings;
+}
+
+// ============================================================
+
 function auditServer(name: string, server: McpServerEntry, filePath?: string): Finding[] {
   const findings: Finding[] = [];
+
+  // CVE-2025-6514: mcp-remote version check (P0)
+  findings.push(...detectCVE20256514(name, server, filePath));
 
   // Check command for dangerous executables
   if (server.command) {

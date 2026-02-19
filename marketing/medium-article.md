@@ -85,13 +85,13 @@ Beyond the DXT-specific issue, AI agent projects face a range of security risks 
 
 ---
 
-## Enter AgentShield: Scanning Your AI Agent Projects
+## Enter Sentori: Scanning Your AI Agent Projects
 
-This is why we built **AgentShield** — a free, open-source security scanner specifically designed for AI Agent projects.
+This is why we built **Sentori** — a free, open-source security scanner specifically designed for AI Agent projects.
 
 ### What It Does
 
-AgentShield runs **13 specialized scanners** that analyze your project for AI-agent-specific security risks:
+Sentori runs **13 specialized scanners** that analyze your project for AI-agent-specific security risks:
 
 | Scanner | What It Checks |
 |---------|---------------|
@@ -109,21 +109,21 @@ Each scanner produces actionable findings with severity levels and remediation g
 **Option 1: CLI (local scan)**
 
 ```bash
-npx aiagentshield /path/to/project
+npx @nexylore/sentori /path/to/project
 ```
 
 That's it. No installation, no configuration, no API keys. npx downloads and runs it. You get results in your terminal.
 
 **Option 2: Web scanner**
 
-Go to [agentshield-web.vercel.app](https://agentshield-web.vercel.app), paste a GitHub repository URL, and hit scan. No signup required. No cost. Results in seconds.
+Go to [sentori-web.vercel.app](https://sentori-web.vercel.app), paste a GitHub repository URL, and hit scan. No signup required. No cost. Results in seconds.
 
 ### What a Scan Looks Like
 
-When you run AgentShield against a typical AI agent project, you might see output like:
+When you run Sentori against a typical AI agent project, you might see output like:
 
 ```
-🛡️ AgentShield Security Scan Results
+🛡️ Sentori Security Scan Results
 =====================================
 
 [HIGH] Supply Chain: 3 dependencies with known CVEs
@@ -163,7 +163,7 @@ This is in active development. If you want to contribute, the repo is open.
 
 Whether or not you use DXT specifically, if you're building or using AI agents, here's your action plan:
 
-1. **Scan your projects.** Run `npx aiagentshield` on every AI agent project you maintain. It takes seconds and it's free.
+1. **Scan your projects.** Run `npx @nexylore/sentori` on every AI agent project you maintain. It takes seconds and it's free.
 
 2. **Audit your MCP configurations.** Check what permissions your MCP servers have. Do they need file system access? Shell execution? If not, remove it.
 
@@ -177,21 +177,21 @@ Whether or not you use DXT specifically, if you're building or using AI agents, 
 
 ## Final Thoughts
 
-我做 AgentShield 的初衷很簡單：AI Agent 是未來，但如果安全跟不上，這個未來會很危險。
+我做 Sentori 的初衷很簡單：AI Agent 是未來，但如果安全跟不上，這個未來會很危險。
 
 The DXT vulnerability is a wake-up call, but it shouldn't surprise anyone. When you give an AI model unsandboxed system access and let it autonomously chain tools together, bad things will happen. It's not a question of if, but when.
 
-The good news: we can build tools to catch these problems early. AgentShield is one attempt. It's free, it's open source, and it's actively maintained.
+The good news: we can build tools to catch these problems early. Sentori is one attempt. It's free, it's open source, and it's actively maintained.
 
 Scan your projects. Fix what you find. And if you build something to make AI agents safer, please share it. We need all the help we can get.
 
 ---
 
-**🛡️ AgentShield**
-- Web: [agentshield-web.vercel.app](https://agentshield-web.vercel.app)
-- CLI: `npx aiagentshield /path/to/project`
-- GitHub: [github.com/TakumaLee/AgentShield](https://github.com/TakumaLee/AgentShield)
-- npm: [aiagentshield](https://www.npmjs.com/package/aiagentshield)
+**🛡️ Sentori**
+- Web: [sentori-web.vercel.app](https://sentori-web.vercel.app)
+- CLI: `npx @nexylore/sentori /path/to/project`
+- GitHub: [github.com/TakumaLee/Sentori](https://github.com/TakumaLee/Sentori)
+- npm: [@nexylore/sentori](https://www.npmjs.com/package/@nexylore/sentori)
 
 ---
 

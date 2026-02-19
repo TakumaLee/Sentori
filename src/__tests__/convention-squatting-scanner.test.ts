@@ -12,7 +12,7 @@ import {
 } from '../scanners/convention-squatting-scanner';
 
 function createTempDir(files: Record<string, string>): string {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentshield-squat-'));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentori-squat-'));
   for (const [name, content] of Object.entries(files)) {
     const filePath = path.join(tmpDir, name);
     fs.mkdirSync(path.dirname(filePath), { recursive: true });

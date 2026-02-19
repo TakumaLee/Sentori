@@ -64,7 +64,7 @@ describe('Environment Isolation Auditor', () => {
     let tmpDir: string;
 
     beforeEach(() => {
-      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentshield-test-'));
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentori-test-'));
     });
 
     afterEach(() => {
@@ -177,7 +177,7 @@ describe('Environment Isolation Auditor', () => {
     let tmpDir: string;
 
     beforeEach(() => {
-      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentshield-test-'));
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentori-test-'));
     });
 
     afterEach(() => {
@@ -274,7 +274,7 @@ CMD ["node", "index.js"]
     let tmpDir: string;
 
     beforeEach(() => {
-      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentshield-test-'));
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentori-test-'));
     });
 
     afterEach(() => {
@@ -353,7 +353,7 @@ services:
     let tmpDir: string;
 
     beforeEach(() => {
-      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentshield-test-'));
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentori-test-'));
     });
 
     afterEach(() => {
@@ -409,7 +409,7 @@ services:
     let tmpDir: string;
 
     beforeEach(() => {
-      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentshield-test-'));
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentori-test-'));
     });
 
     afterEach(() => {
@@ -525,7 +525,7 @@ privileged: true
     let tmpDir: string;
 
     beforeEach(() => {
-      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentshield-test-'));
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentori-test-'));
     });
 
     afterEach(() => {
