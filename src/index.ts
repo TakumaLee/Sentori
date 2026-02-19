@@ -19,6 +19,7 @@ export { ragPoisoningScanner } from './scanners/rag-poisoning-scanner';
 export { redTeamSimulator } from './scanners/red-team-simulator';
 export { secretLeakScanner } from './scanners/secret-leak-scanner';
 export { skillAuditor } from './scanners/skill-auditor';
+export { openclawConfigAuditor } from './scanners/openclaw-config-auditor';
 export { walkFiles } from './utils/file-walker';
 export * from './types';
 
@@ -46,6 +47,7 @@ import { ragPoisoningScanner } from './scanners/rag-poisoning-scanner';
 import { redTeamSimulator } from './scanners/red-team-simulator';
 import { secretLeakScanner } from './scanners/secret-leak-scanner';
 import { skillAuditor } from './scanners/skill-auditor';
+import { openclawConfigAuditor } from './scanners/openclaw-config-auditor';
 
 export function createDefaultRegistry(externalIOCPath?: string): ScannerRegistry {
   const registry = new ScannerRegistry();
@@ -73,6 +75,7 @@ export function createDefaultRegistry(externalIOCPath?: string): ScannerRegistry
   registry.register(redTeamSimulator as unknown as Scanner);
   registry.register(secretLeakScanner as unknown as Scanner);
   registry.register(skillAuditor as unknown as Scanner);
+  registry.register(openclawConfigAuditor as unknown as Scanner);
 
   return registry;
 }
