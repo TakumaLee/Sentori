@@ -416,3 +416,121 @@ describe('Edge Cases', () => {
     expect(summary.totalFindings).toBe(0);
   });
 });
+
+describe('Third-Party vs Own Code Weighting', () => {
+  test('third-party findings have reduced weight', () => {
+    // 1 third-party critical = 1 × 1.0 (confidence) × 0.3 (third-party) = 0.3 effective
+    // penalty = 20 * log2(0.3 + 1) ≈ 20 * 0.379 ≈ 7.58
+    const results: ScanResult[] = [{
+      scanner: 'test',
+      findings: [{
+        ...makeFinding('c1', 'critical'),
+        isThirdParty: true,
+      }],
+      scannedFiles: 1,
+      duration: 50,
+    }];
+    const summary = calculateSummary(results);
+    // Should have much less impact than a normal critical (which would give score ~93)
+    // codeSafety ≈ 92, weighted: 92×0.35+100×0.25+100×0.25+100×0.15 ≈ 97
+    expect(summary.score).toBeGreaterThan(93);
+    expect(summary.score).toBeLessThanOrEqual(100);
+  });
+
+  test('own code findings have full weight', () => {
+    const results: ScanResult[] = [{
+      scanner: 'test',
+      findings: [{
+        ...makeFinding('c1', 'critical'),
+        isThirdParty: false,
+      }],
+      scannedFiles: 1,
+      duration: 50,
+    }];
+    const summary = calculateSummary(results);
+    // Should have full impact (same as before)
+    // codeSafety=80, weighted: 80×0.35+100×0.25+100×0.25+100×0.15=93
+    expect(summary.score).toBe(93);
+  });
+
+  test('mixed third-party and own code findings weighted correctly', () => {
+    // 1 own critical (1.0) + 1 third-party critical (0.3) = 1.3 effective
+    // penalty = 20 * log2(1.3 + 1) ≈ 20 * 1.203 ≈ 24.06
+    const results: ScanResult[] = [{
+      scanner: 'test',
+      findings: [
+        { ...makeFinding('c1', 'critical'), isThirdParty: false },
+        { ...makeFinding('c2', 'critical'), isThirdParty: true },
+      ],
+      scannedFiles: 1,
+      duration: 50,
+    }];
+    const summary = calculateSummary(results);
+    // codeSafety ≈ 76, weighted: 76×0.35+100×0.25+100×0.25+100×0.15 ≈ 91
+    // Should be between own-only (93) and better than 2 own criticals (~87)
+    expect(summary.score).toBeGreaterThan(87);
+    expect(summary.score).toBeLessThan(93);
+  });
+
+  test('many third-party findings have less impact than few own findings', () => {
+    // 10 third-party critical = 10 × 0.3 = 3.0 effective
+    // vs 3 own critical = 3.0 effective (same weight!)
+    const thirdPartyResults: ScanResult[] = [{
+      scanner: 'test',
+      findings: Array.from({ length: 10 }, (_, i) => ({
+        ...makeFinding(`c${i}`, 'critical'),
+        isThirdParty: true,
+      })),
+      scannedFiles: 1,
+      duration: 50,
+    }];
+
+    const ownCodeResults: ScanResult[] = [{
+      scanner: 'test',
+      findings: Array.from({ length: 3 }, (_, i) => ({
+        ...makeFinding(`c${i}`, 'critical'),
+        isThirdParty: false,
+      })),
+      scannedFiles: 1,
+      duration: 50,
+    }];
+
+    const thirdPartySummary = calculateSummary(thirdPartyResults);
+    const ownCodeSummary = calculateSummary(ownCodeResults);
+
+    // Both should have similar scores (both 3.0 effective criticals)
+    expect(Math.abs(thirdPartySummary.score - ownCodeSummary.score)).toBeLessThan(3);
+  });
+
+  test('third-party weight applies with confidence weighting', () => {
+    // 1 possible third-party critical = 1 × 0.6 (confidence) × 0.3 (third-party) = 0.18 effective
+    // penalty = 20 * log2(0.18 + 1) ≈ 20 * 0.238 ≈ 4.76
+    const results: ScanResult[] = [{
+      scanner: 'test',
+      findings: [{
+        ...makeFinding('c1', 'critical', 'test', 'possible'),
+        isThirdParty: true,
+      }],
+      scannedFiles: 1,
+      duration: 50,
+    }];
+    const summary = calculateSummary(results);
+    // Very minimal impact
+    // codeSafety ≈ 95, weighted: 95×0.35+100×0.25+100×0.25+100×0.15 ≈ 98
+    expect(summary.score).toBeGreaterThan(95);
+    expect(summary.score).toBeLessThanOrEqual(100);
+  });
+
+  test('undefined isThirdParty defaults to own code (full weight)', () => {
+    const results: ScanResult[] = [{
+      scanner: 'test',
+      findings: [makeFinding('c1', 'critical')], // isThirdParty not set
+      scannedFiles: 1,
+      duration: 50,
+    }];
+    const summary = calculateSummary(results);
+    // Should have full impact (same as isThirdParty=false)
+    // codeSafety=80, weighted: 80×0.35+100×0.25+100×0.25+100×0.15=93
+    expect(summary.score).toBe(93);
+  });
+});

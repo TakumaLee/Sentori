@@ -24,6 +24,11 @@ const CONFIDENCE_WEIGHT: Record<Confidence, number> = {
   possible: 0.6,
 };
 
+// Third-party vs own code weighting
+// Third-party code issues have lower weight (developers can't directly fix them)
+const THIRD_PARTY_WEIGHT = 0.3;
+const OWN_CODE_WEIGHT = 1.0;
+
 // Scanner → dimension mapping
 const DIMENSION_MAP: Record<string, 'codeSafety' | 'configSafety' | 'defenseScore' | 'environmentSafety'> = {
   'Secret Leak Scanner': 'codeSafety',
@@ -56,15 +61,18 @@ export function interactionPenalty(critical: number, high: number): number {
 }
 
 /**
- * Calculate effective severity counts weighted by confidence.
+ * Calculate effective severity counts weighted by confidence and code ownership.
  * E.g., 3 possible high findings = 3 × 0.6 = 1.8 effective highs.
+ * Third-party findings are further weighted by THIRD_PARTY_WEIGHT (0.3).
  */
 function weightedSeverityCounts(findings: Finding[]): Record<Severity, number> {
   const counts: Record<Severity, number> = { critical: 0, high: 0, medium: 0, info: 0 };
 
   for (const f of findings) {
-    const weight = CONFIDENCE_WEIGHT[f.confidence ?? 'definite'];
-    counts[f.severity] += weight;
+    const confidenceWeight = CONFIDENCE_WEIGHT[f.confidence ?? 'definite'];
+    const ownershipWeight = f.isThirdParty ? THIRD_PARTY_WEIGHT : OWN_CODE_WEIGHT;
+    const totalWeight = confidenceWeight * ownershipWeight;
+    counts[f.severity] += totalWeight;
   }
 
   return counts;
