@@ -47,6 +47,15 @@ const URL_RESOLUTION_PATTERNS: Array<{ pattern: RegExp; desc: string }> = [
   { pattern: /\bnew\s+URL\s*\(\s*['"`][\w-]+\.\w{2,4}['"`]\s*\)/gi, desc: 'new URL() with filename-like argument' },
 ];
 
+/** Default npm fetch timeout in ms. */
+const DEFAULT_FETCH_TIMEOUT_MS = 2000;
+
+/** Default maximum number of unique packages to query from npm. */
+const DEFAULT_MAX_PACKAGE_QUERIES = 50;
+
+/** Concurrency limit for parallel npm metadata fetches. */
+const FETCH_CONCURRENCY = 5;
+
 // --- Helpers ---
 
 function findLineNumber(content: string, matchIndex: number): number {
@@ -120,9 +129,15 @@ export async function fetchPackageMetadata(
 }
 
 async function defaultFetcher(url: string): Promise<any> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.json();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 /**
@@ -218,8 +233,15 @@ export class ConventionSquattingScanner implements Scanner {
   private enableContextScoring: boolean;
   /** Injected fetcher for testing. */
   private fetcher: (url: string) => Promise<any>;
-  /** Scan depth for node_modules: 1 = direct deps only, 0 = skip node_modules, -1 = unlimited */
+  /**
+   * Scan depth for node_modules:
+   *   0 = skip node_modules (default)
+   *   1 = direct deps only
+   *  -1 = unlimited
+   */
   private nodeModulesDepth: number;
+  /** Maximum number of unique packages to query from npm registry per scan. */
+  private maxPackageQueries: number;
 
   constructor(opts?: { 
     resolver?: (hostname: string) => Promise<string[]>; 
@@ -227,12 +249,15 @@ export class ConventionSquattingScanner implements Scanner {
     enableContextScoring?: boolean;
     fetcher?: (url: string) => Promise<any>;
     nodeModulesDepth?: number;
+    maxPackageQueries?: number;
   }) {
     this.resolver = opts?.resolver ?? defaultResolve;
     this.dnsCheck = opts?.dnsCheck ?? false;
     this.enableContextScoring = opts?.enableContextScoring ?? true;
     this.fetcher = opts?.fetcher ?? defaultFetcher;
-    this.nodeModulesDepth = opts?.nodeModulesDepth ?? 1;
+    // Changed default: 0 = skip node_modules (was 1; scanning node_modules caused ~210s on large repos)
+    this.nodeModulesDepth = opts?.nodeModulesDepth ?? 0;
+    this.maxPackageQueries = opts?.maxPackageQueries ?? DEFAULT_MAX_PACKAGE_QUERIES;
   }
 
   async scan(targetDir: string): Promise<ScanResult> {
@@ -244,6 +269,30 @@ export class ConventionSquattingScanner implements Scanner {
     if (this.nodeModulesDepth > 0) {
       const nodeModulesFiles = this.scanNodeModules(targetDir, this.nodeModulesDepth);
       files.push(...nodeModulesFiles);
+    }
+
+    // --- Pre-fetch npm metadata for all TLD-collision files (batched + cached) ---
+    const metadataCache = new Map<string, PackageMetadata | null>();
+    if (this.enableContextScoring) {
+      // Collect unique package names from TLD-collision files, capped at maxPackageQueries
+      const collisionBasenames = files
+        .map(f => path.basename(f.relativePath).toLowerCase())
+        .filter(b => isTLDCollision(b));
+      const uniquePackageNames = [...new Set(
+        collisionBasenames.map(b => b.replace(/\.[^/.]+$/, ''))
+      )].slice(0, this.maxPackageQueries);
+
+      // Fetch in parallel batches
+      for (let i = 0; i < uniquePackageNames.length; i += FETCH_CONCURRENCY) {
+        const batch = uniquePackageNames.slice(i, i + FETCH_CONCURRENCY);
+        const results = await Promise.allSettled(
+          batch.map(name => fetchPackageMetadata(name, this.fetcher))
+        );
+        results.forEach((result, idx) => {
+          const name = batch[idx];
+          metadataCache.set(name, result.status === 'fulfilled' ? result.value : null);
+        });
+      }
     }
 
     // Rule 1: Convention Filename TLD Collision
@@ -259,12 +308,14 @@ export class ConventionSquattingScanner implements Scanner {
           ? 'CRITICAL: This file is read periodically — a squatted domain would enable persistent injection. Use absolute local paths and validate file source is local filesystem, not network.'
           : 'Filename resolves as a valid domain. Ensure agent reads via local fs path, not URL resolution. Add integrity checks (hash verification) for convention files.';
 
-        // Apply context scoring if enabled
+        // Apply context scoring if enabled (use pre-fetched cache)
         let contextNote = '';
         if (this.enableContextScoring) {
-          // Convert domain to potential npm package name (remove extension)
           const packageName = domain.replace(/\.[^/.]+$/, '');
-          const metadata = await fetchPackageMetadata(packageName, this.fetcher);
+          // Use cached metadata; if not in cache (beyond query limit), treat as null
+          const metadata = metadataCache.has(packageName)
+            ? metadataCache.get(packageName)!
+            : null;
           const contextScore = calculateContextScore(severity, metadata);
           
           if (contextScore.adjustedSeverity !== severity) {
