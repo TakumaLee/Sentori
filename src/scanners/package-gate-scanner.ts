@@ -1,5 +1,5 @@
 /**
- * PackageGateScanner — Phase 1: Lock file parser
+ * PackageGateScanner — Phase 2: Version Conflict Detection
  *
  * Supports:
  *  - package-lock.json  (npm)
@@ -9,7 +9,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { Scanner, ScanResult, Finding } from '../types';
+import { Scanner, ScanResult, Finding, Severity } from '../types';
 
 // ---------------------------------------------------------------------------
 // Public interfaces
@@ -29,6 +29,14 @@ export interface ParsedLockResult {
   rawVersionMap: Record<string, string[]>;
 }
 
+export interface ConflictFinding {
+  packageName: string;
+  versions: string[]; // all versions found
+  conflictType: 'multi-version' | 'suspicious-version' | 'pinned-mismatch';
+  severity: Severity;
+  details?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
@@ -43,6 +51,72 @@ function addToVersionMap(
   if (!map[name].includes(version)) {
     map[name].push(version);
   }
+}
+
+// Strict semver: x.y.z (digits only, no suffix)
+const SEMVER_STRICT = /^\d+\.\d+\.\d+$/;
+
+// Suspicious pre-release suffixes
+const SUSPICIOUS_SUFFIX = /(-beta|-alpha|-rc|-dev)(\.\d+)?$/i;
+
+// Suspicious .0.0 ending (often placeholder/default)
+const SUSPICIOUS_ZERO = /\.0\.0$/;
+
+// ---------------------------------------------------------------------------
+// Version Conflict Detection (Phase 2 Core)
+// ---------------------------------------------------------------------------
+
+/**
+ * Detect version conflicts and anomalies from a parsed lock file result.
+ *
+ * Returns ConflictFinding[] covering three conflict types:
+ *  - multi-version:      same package resolved to ≥2 different versions
+ *  - suspicious-version: version has pre-release suffix or .0.0 ending
+ *  - pinned-mismatch:    version doesn't match strict semver (x.y.z)
+ */
+export function detectVersionConflicts(result: ParsedLockResult): ConflictFinding[] {
+  const findings: ConflictFinding[] = [];
+
+  for (const [packageName, versions] of Object.entries(result.rawVersionMap)) {
+    // 1. multi-version: ≥2 different versions for the same package
+    if (versions.length >= 2) {
+      findings.push({
+        packageName,
+        versions: [...versions],
+        conflictType: 'multi-version',
+        severity: 'medium',
+        details: `Found ${versions.length} different versions: ${versions.join(', ')}`,
+      });
+    }
+
+    // 2. suspicious-version: pre-release suffix or .0.0 ending
+    const suspiciousVersions = versions.filter(
+      (v) => SUSPICIOUS_SUFFIX.test(v) || SUSPICIOUS_ZERO.test(v),
+    );
+    if (suspiciousVersions.length > 0) {
+      findings.push({
+        packageName,
+        versions: suspiciousVersions,
+        conflictType: 'suspicious-version',
+        severity: 'high',
+        details: `Suspicious version(s) detected: ${suspiciousVersions.join(', ')}`,
+      });
+    }
+
+    // 3. pinned-mismatch: version does not conform to x.y.z semver
+    const nonSemverVersions = versions.filter((v) => !SEMVER_STRICT.test(v));
+    if (nonSemverVersions.length > 0) {
+      findings.push({
+        packageName,
+        versions: nonSemverVersions,
+        conflictType: 'pinned-mismatch',
+        severity: 'medium',
+        details: `Non-semver version(s): ${nonSemverVersions.join(', ')}`,
+      });
+    }
+  }
+
+  return findings;
 }
 
 // ---------------------------------------------------------------------------
@@ -340,8 +414,158 @@ export class PackageGateLockParser {
 }
 
 // ---------------------------------------------------------------------------
-// PackageGateScanner — Phase 1 skeleton (implements Scanner)
-// Scan logic is deferred to Phase 2.
+// Phase 3A: Suspicious install hooks detection
+// ---------------------------------------------------------------------------
+
+/** Hook script names to inspect */
+const HOOK_SCRIPTS = ['preinstall', 'install', 'postinstall'] as const;
+
+/** PKGATE-010: Dangerous shell commands */
+const DANGEROUS_COMMANDS_RE = /\b(curl|wget|bash|sh|eval|exec)\b/;
+
+/** PKGATE-011: Base64 decode patterns */
+const BASE64_DECODE_RE =
+  /base64\s+(--decode|-d)|atob\s*\(|Buffer\.from\s*\([^,)]+,\s*['"]base64['"]\)/;
+
+/** PKGATE-012: External URL references */
+const EXTERNAL_URL_RE = /https?:\/\//;
+
+/**
+ * Detect suspicious install hooks in a `package.json` file.
+ *
+ * Checks `scripts.preinstall`, `scripts.install`, and `scripts.postinstall` for:
+ *  - PKGATE-010 (high):     dangerous shell commands (curl, wget, bash, sh, eval, exec)
+ *  - PKGATE-011 (critical): base64 decode patterns
+ *  - PKGATE-012 (high):     external URL references (http/https)
+ *  - PKGATE-013 (info):     blank / whitespace-only hook
+ *
+ * @param packageJsonContent  UTF-8 content of the `package.json` file
+ * @param filePath            Absolute path of the file (used for Finding.file)
+ * @returns Finding[] — may be empty if no suspicious hooks found
+ */
+export function detectSuspiciousHooks(
+  packageJsonContent: string,
+  filePath: string,
+): Finding[] {
+  const findings: Finding[] = [];
+
+  let pkg: Record<string, unknown>;
+  try {
+    pkg = JSON.parse(packageJsonContent);
+  } catch {
+    return [];
+  }
+
+  const scripts =
+    pkg.scripts && typeof pkg.scripts === 'object'
+      ? (pkg.scripts as Record<string, unknown>)
+      : {};
+
+  for (const hookName of HOOK_SCRIPTS) {
+    const rawScript = scripts[hookName];
+    if (rawScript === undefined) continue;
+    if (typeof rawScript !== 'string') continue;
+
+    const script = rawScript;
+    const trimmed = script.trim();
+
+    // PKGATE-013: blank hook (whitespace only)
+    if (trimmed === '') {
+      findings.push({
+        id: 'PKGATE-013',
+        scanner: 'PackageGateScanner',
+        severity: 'info',
+        title: `Blank ${hookName} hook detected`,
+        description: `The "${hookName}" script in ${filePath} contains only whitespace and does nothing.`,
+        file: filePath,
+        recommendation:
+          'Remove empty install hooks. Blank hooks may be placeholder remnants or the result of accidental script injection.',
+      });
+      continue; // blank — no further analysis needed
+    }
+
+    // PKGATE-011: base64 decode (critical — check before dangerous-command to avoid ordering issues)
+    if (BASE64_DECODE_RE.test(trimmed)) {
+      findings.push({
+        id: 'PKGATE-011',
+        scanner: 'PackageGateScanner',
+        severity: 'critical',
+        title: `Base64 decode in "${hookName}" hook`,
+        description: `The "${hookName}" script decodes base64 data: ${trimmed.slice(0, 120)}${trimmed.length > 120 ? '…' : ''}`,
+        file: filePath,
+        recommendation:
+          'Base64-encoded payloads in install hooks are a classic supply-chain attack pattern. ' +
+          'Audit this script immediately and remove if not explicitly required.',
+      });
+    }
+
+    // PKGATE-010: dangerous shell commands
+    if (DANGEROUS_COMMANDS_RE.test(trimmed)) {
+      findings.push({
+        id: 'PKGATE-010',
+        scanner: 'PackageGateScanner',
+        severity: 'high',
+        title: `Dangerous command in "${hookName}" hook`,
+        description: `The "${hookName}" script contains potentially dangerous shell commands: ${trimmed.slice(0, 120)}${trimmed.length > 120 ? '…' : ''}`,
+        file: filePath,
+        recommendation:
+          'Avoid using shell execution primitives (curl, wget, bash, sh, eval, exec) in install hooks. ' +
+          'These commands can be exploited by supply-chain attackers to run arbitrary code on install.',
+      });
+    }
+
+    // PKGATE-012: external URL reference
+    if (EXTERNAL_URL_RE.test(trimmed)) {
+      findings.push({
+        id: 'PKGATE-012',
+        scanner: 'PackageGateScanner',
+        severity: 'high',
+        title: `External URL in "${hookName}" hook`,
+        description: `The "${hookName}" script references an external URL: ${trimmed.slice(0, 120)}${trimmed.length > 120 ? '…' : ''}`,
+        file: filePath,
+        recommendation:
+          'Install hooks that fetch from external URLs introduce supply-chain risk. ' +
+          'Verify that the endpoint is legitimate and consider bundling resources locally.',
+      });
+    }
+  }
+
+  return findings;
+}
+
+// ---------------------------------------------------------------------------
+// Conflict type → rule ID / title / recommendation mapping
+// ---------------------------------------------------------------------------
+
+const CONFLICT_RULE_MAP: Record<
+  ConflictFinding['conflictType'],
+  { id: string; title: string; recommendation: string }
+> = {
+  'multi-version': {
+    id: 'PKGATE-001',
+    title: 'Multiple versions of the same package detected',
+    recommendation:
+      'Deduplicate dependency versions by aligning transitive requirements. ' +
+      'Run `npm dedupe` (npm) or check `pnpm why <package>` (pnpm) to understand the conflict tree.',
+  },
+  'suspicious-version': {
+    id: 'PKGATE-002',
+    title: 'Suspicious pre-release or placeholder version detected',
+    recommendation:
+      'Avoid using pre-release versions (-alpha, -beta, -rc, -dev) or placeholder .0.0 versions ' +
+      'in production. Pin to a stable release and verify the package integrity.',
+  },
+  'pinned-mismatch': {
+    id: 'PKGATE-003',
+    title: 'Non-semver version format detected in lock file',
+    recommendation:
+      'Ensure all resolved versions conform to semver (x.y.z). ' +
+      'Non-semver strings may indicate git references, local paths, or registry anomalies.',
+  },
+};
+
+// ---------------------------------------------------------------------------
+// PackageGateScanner — Phase 2 (implements Scanner)
 // ---------------------------------------------------------------------------
 
 export class PackageGateScanner implements Scanner {
@@ -355,7 +579,7 @@ export class PackageGateScanner implements Scanner {
     const findings: Finding[] = [];
     let filesScanned = 0;
 
-    // Locate lock files under targetDir
+    // Locate lock files under targetDir (recursive, skips node_modules / build dirs)
     const lockFiles: Array<{ filePath: string; type: 'npm' | 'pnpm' | 'bun' }> = [];
 
     function findLockFiles(dir: string, depth = 0): void {
@@ -393,19 +617,71 @@ export class PackageGateScanner implements Scanner {
           content = fs.readFileSync(filePath, 'utf-8');
         }
 
-        // TODO (Phase 2): analyse parsed result for:
-        //   - Version pinning violations
-        //   - Known-malicious packages (CVE / IOC cross-reference)
-        //   - Registry confusion (non-standard resolved URLs)
-        //   - Ghost dependencies
-        //   - Version drift across workspaces
-        let _parsed;
+        // Parse lock file
+        let parsed: ParsedLockResult;
         switch (type) {
-          case 'npm':  _parsed = this.parser.parseNpmLock(content);  break;
-          case 'pnpm': _parsed = this.parser.parsePnpmLock(content); break;
-          case 'bun':  _parsed = this.parser.parseBunLock(content);  break;
+          case 'npm':  parsed = this.parser.parseNpmLock(content);  break;
+          case 'pnpm': parsed = this.parser.parsePnpmLock(content); break;
+          case 'bun':  parsed = this.parser.parseBunLock(content);  break;
         }
-        // Phase 2 will use _parsed to generate findings
+
+        // Detect version conflicts
+        const conflicts = detectVersionConflicts(parsed);
+
+        // Convert ConflictFinding[] → Finding[]
+        for (const conflict of conflicts) {
+          const rule = CONFLICT_RULE_MAP[conflict.conflictType];
+          findings.push({
+            id: rule.id,
+            scanner: this.name,
+            severity: conflict.severity,
+            title: `[${conflict.packageName}] ${rule.title}`,
+            description:
+              conflict.details ??
+              `Package "${conflict.packageName}" has ${conflict.conflictType} conflict.`,
+            file: filePath,
+            recommendation: rule.recommendation,
+          });
+        }
+      } catch {
+        // skip unreadable files
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Phase 3B: Scan package.json files for suspicious install hooks
+    // -----------------------------------------------------------------------
+
+    const packageJsonFiles: string[] = [];
+
+    function findPackageJsonFiles(dir: string, depth = 0): void {
+      if (depth > 6) return;
+      if (!fs.existsSync(dir)) return;
+      let items: fs.Dirent[];
+      try {
+        items = fs.readdirSync(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const item of items) {
+        if (item.isDirectory()) {
+          // Skip vendor / build dirs (same exclusion list as lock file search)
+          if (['node_modules', '.git', 'dist', 'build'].includes(item.name)) continue;
+          findPackageJsonFiles(path.join(dir, item.name), depth + 1);
+        } else if (item.isFile() && item.name === 'package.json') {
+          packageJsonFiles.push(path.join(dir, item.name));
+        }
+      }
+    }
+
+    findPackageJsonFiles(targetDir);
+
+    for (const pkgJsonPath of packageJsonFiles) {
+      filesScanned++;
+      try {
+        const content = fs.readFileSync(pkgJsonPath, 'utf-8');
+        const hookFindings = detectSuspiciousHooks(content, pkgJsonPath);
+        findings.push(...hookFindings);
       } catch {
         // skip unreadable files
       }
