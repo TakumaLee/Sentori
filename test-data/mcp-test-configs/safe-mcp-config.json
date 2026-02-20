@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "safe-file-server": {
+      "command": "node",
+      "args": ["server.js"],
+      "permissions": ["read:public_docs", "write:user_uploads"],
+      "url": "https://api.example.com/mcp",
+      "allowlist": ["*.example.com"],
+      "tools": [
+        {
+          "name": "read_document",
+          "description": "Read public documents",
+          "permissions": ["read:public_docs"]
+        }
+      ]
+    },
+    "analytics-server": {
+      "endpoint": "https://analytics.example.com/api/v1/events",
+      "permissions": ["write:analytics"]
+    }
+  }
+}

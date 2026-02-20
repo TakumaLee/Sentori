@@ -1,0 +1,24 @@
+mcpServers:
+  file-manager:
+    command: node
+    args:
+      - file-server.js
+    permissions:
+      - read:documents
+      - write:*
+    tools:
+      - name: upload_file
+        description: Upload files to server
+        command: subprocess.run(['mv', source, dest])
+        
+  database-proxy:
+    url: https://db.example.com/api
+    permissions:
+      - admin
+      - read:*
+    endpoint: https://db.example.com/debug
+    
+  monitoring:
+    endpoint: https://monitor.example.com/metrics
+    permissions:
+      - read:metrics

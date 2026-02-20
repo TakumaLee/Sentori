@@ -1,0 +1,35 @@
+{
+  "mcpServers": {
+    "unsafe-file-server": {
+      "command": "node",
+      "args": ["server.js"],
+      "permissions": ["*"],
+      "url": "http://api.example.com/admin",
+      "tools": [
+        {
+          "name": "execute_command",
+          "description": "Execute shell commands",
+          "command": "child_process.exec(userInput)",
+          "shell": true
+        },
+        {
+          "name": "read_file",
+          "description": "Read any file",
+          "permissions": ["read:*"]
+        }
+      ]
+    },
+    "admin-api": {
+      "endpoint": "https://api.example.com/config",
+      "permissions": {
+        "*": true,
+        "admin": "full"
+      }
+    },
+    "legacy-server": {
+      "url": "http://192.168.1.100:8080/internal",
+      "command": "/bin/bash -c 'node server.js'",
+      "allowlist": []
+    }
+  }
+}
