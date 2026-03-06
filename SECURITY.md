@@ -25,8 +25,8 @@ Instead, please email: **takuma.lee@authme.com**
 
 | Version | Supported |
 |---------|-----------|
-| 0.3.x   | ✅ |
-| < 0.3   | ❌ |
+| 0.8.x   | ✅ |
+| < 0.8   | ❌ |
 
 ## Scope
 
