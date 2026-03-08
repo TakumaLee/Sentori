@@ -44,6 +44,19 @@ function isErrorEvent(event: ToolCallEvent): boolean {
 /** Sensitive tool name patterns (case-insensitive). */
 const SENSITIVE_PATTERN = /bash|shell|exec|run|execute|delete|rm|write/i;
 
+/** Pattern: base64-alphabet string, minimum 100 chars, with optional = padding. */
+const BASE64_PATTERN = /^[A-Za-z0-9+/]{100,}={0,2}$/;
+
+/** Recursively collect all string values from an arbitrary object. */
+function collectStrings(value: unknown): string[] {
+  if (typeof value === 'string') return [value];
+  if (Array.isArray(value)) return value.flatMap(collectStrings);
+  if (value !== null && typeof value === 'object') {
+    return Object.values(value as Record<string, unknown>).flatMap(collectStrings);
+  }
+  return [];
+}
+
 // ---------------------------------------------------------------------------
 // Default Rules
 // ---------------------------------------------------------------------------
@@ -194,7 +207,9 @@ export const RULE_004: AnomalyRule = {
 
 /**
  * RULE-005: data_exfiltration
- * JSON.stringify(args) length exceeds 10 KB.
+ * Triggers when args either (a) exceed 10 KB serialised, or (b) contain a
+ * base64-encoded string of ≥ 100 chars — a common technique to smuggle data
+ * past size-only detectors.
  */
 export const RULE_005: AnomalyRule = {
   id: 'RULE-005',
@@ -206,12 +221,19 @@ export const RULE_005: AnomalyRule = {
 
     for (const event of events) {
       const serialized = JSON.stringify(event.args);
-      if (serialized.length > THRESHOLD_BYTES) {
+      const oversized = serialized.length > THRESHOLD_BYTES;
+      const hasBase64 = collectStrings(event.args).some((s) => BASE64_PATTERN.test(s));
+
+      if (oversized || hasBase64) {
+        const reasons: string[] = [];
+        if (oversized) reasons.push(`args size ${serialized.length} bytes exceeds 10KB threshold`);
+        if (hasBase64) reasons.push('base64-encoded data detected');
+
         matches.push({
           ruleId: 'RULE-005',
           type: 'data_exfiltration',
           severity: 'critical',
-          description: `Tool "${event.toolName}" args size ${serialized.length} bytes exceeds 10KB threshold`,
+          description: `Tool "${event.toolName}": ${reasons.join('; ')}`,
           relatedEvents: [event.id],
           score: 90,
         });

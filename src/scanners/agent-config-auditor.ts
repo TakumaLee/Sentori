@@ -6,13 +6,13 @@ import { findConfigFiles, readFileContent, isJsonFile, isYamlFile, tryParseJson,
  * Agent Config Auditor — scans AI Agent platform configuration files
  * for security misconfigurations.
  *
- * Currently supports OpenClaw format. Designed to be extensible for
+ * Currently supports Tetora format. Designed to be extensible for
  * other agent platforms in the future.
  */
 
 // Config file names we specifically look for
 const AGENT_CONFIG_FILENAMES = [
-  'openclaw.json',
+  'tetora.json',
   'claude.json',
   'config.json',
   'config.yaml',

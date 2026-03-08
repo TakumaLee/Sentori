@@ -1,12 +1,12 @@
 /**
- * Tests for OpenClaw Config Auditor
+ * Tests for Tetora Config Auditor
  * Covers: API key leakage, overly broad tool permissions, cron payload injection, channel token detection
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import { auditApiKeys, auditToolPermissions, auditCronPayloads, auditChannelTokens, openclawConfigAuditor } from '../src/scanners/openclaw-config-auditor';
+import { auditApiKeys, auditToolPermissions, auditCronPayloads, auditChannelTokens, tetoraConfigAuditor } from '../src/scanners/tetora-config-auditor';
 
-const TEMP_DIR = path.join(__dirname, '__temp_openclaw_auditor__');
+const TEMP_DIR = path.join(__dirname, '__temp_tetora_auditor__');
 
 beforeAll(() => {
   fs.mkdirSync(path.join(TEMP_DIR, 'cron'), { recursive: true });
@@ -21,7 +21,7 @@ afterAll(() => {
 describe('auditApiKeys — API key leakage detection', () => {
   it('detects Anthropic sk-ant- key as critical', () => {
     const content = JSON.stringify({ apiKey: 'sk-ant-api01-ABCDEFGHIJKLMNOP1234567890ABCDEFGHIJKLMNOP12345678' });
-    const findings = auditApiKeys(content, 'openclaw.json');
+    const findings = auditApiKeys(content, 'tetora.json');
     expect(findings.length).toBeGreaterThan(0);
     expect(findings[0].severity).toBe('critical');
     expect(findings[0].id).toContain('OC-001');
@@ -42,7 +42,7 @@ describe('auditApiKeys — API key leakage detection', () => {
 
   it('detects Brave API key as high', () => {
     const content = JSON.stringify({ apiKey: 'BSATOcEkp3QBhFi8uuvQ4Swk4vb9-X6ABCDEFGtest' });
-    const findings = auditApiKeys(content, 'openclaw.json');
+    const findings = auditApiKeys(content, 'tetora.json');
     expect(findings.length).toBeGreaterThan(0);
     expect(findings[0].severity).toBe('high');
   });
@@ -76,7 +76,7 @@ describe('auditToolPermissions — overly broad permission detection', () => {
         exec: { enabled: true, security: 'full' },
       },
     };
-    const findings = auditToolPermissions(config, 'openclaw.json');
+    const findings = auditToolPermissions(config, 'tetora.json');
     expect(findings.length).toBeGreaterThan(0);
     expect(findings[0].severity).toBe('high');
     expect(findings[0].id).toContain('OC-002');
@@ -89,7 +89,7 @@ describe('auditToolPermissions — overly broad permission detection', () => {
         exec: { enabled: true, security: 'allowlist', allowlist: ['ls', '*', 'cat'] },
       },
     };
-    const findings = auditToolPermissions(config, 'openclaw.json');
+    const findings = auditToolPermissions(config, 'tetora.json');
     expect(findings.some(f => f.id?.includes('wildcard'))).toBe(true);
     expect(findings[0].severity).toBe('high');
   });
@@ -100,7 +100,7 @@ describe('auditToolPermissions — overly broad permission detection', () => {
         browser: { enabled: true, security: 'full' },
       },
     };
-    const findings = auditToolPermissions(config, 'openclaw.json');
+    const findings = auditToolPermissions(config, 'tetora.json');
     expect(findings.some(f => f.id?.includes('browser-full'))).toBe(true);
     expect(findings[0].severity).toBe('medium');
   });
@@ -111,7 +111,7 @@ describe('auditToolPermissions — overly broad permission detection', () => {
         exec: { enabled: true, security: 'allowlist', allowlist: ['ls', 'cat', 'echo'] },
       },
     };
-    const findings = auditToolPermissions(config, 'openclaw.json');
+    const findings = auditToolPermissions(config, 'tetora.json');
     expect(findings.filter(f => f.id?.includes('exec-full'))).toHaveLength(0);
   });
 
@@ -121,14 +121,14 @@ describe('auditToolPermissions — overly broad permission detection', () => {
         myServer: { command: 'node', args: ['server.js'], security: 'full' },
       },
     };
-    const findings = auditToolPermissions(config, 'openclaw.json');
+    const findings = auditToolPermissions(config, 'tetora.json');
     expect(findings.some(f => f.id?.includes('mcp-full-myServer'))).toBe(true);
     expect(findings[0].severity).toBe('high');
   });
 
   it('does not flag config without tool settings', () => {
     const config = { gateway: { port: 18789, bind: '127.0.0.1' } };
-    const findings = auditToolPermissions(config, 'openclaw.json');
+    const findings = auditToolPermissions(config, 'tetora.json');
     expect(findings).toHaveLength(0);
   });
 });
@@ -247,7 +247,7 @@ describe('auditCronPayloads — shell injection detection', () => {
         ],
       },
     };
-    const findings = auditCronPayloads(config, 'openclaw.json');
+    const findings = auditCronPayloads(config, 'tetora.json');
     expect(findings.length).toBeGreaterThan(0);
   });
 });
@@ -259,7 +259,7 @@ describe('auditChannelTokens — unencrypted token detection', () => {
     const content = JSON.stringify({
       channels: { telegram: { token: '1234567890:AABBccddEEFFggHHiiJJkkLLmmNNooQQrrss' } },
     });
-    const findings = auditChannelTokens(content, 'openclaw.json');
+    const findings = auditChannelTokens(content, 'tetora.json');
     expect(findings.length).toBeGreaterThan(0);
     expect(findings[0].severity).toBe('high');
     expect(findings[0].id).toContain('OC-004');
@@ -275,7 +275,7 @@ describe('auditChannelTokens — unencrypted token detection', () => {
 
   it('detects Slack bot token in config file as high', () => {
     const content = JSON.stringify({
-      slack: { botToken: 'FAKE_SLACK_BOT_TOKEN_FOR_TESTING' },
+      slack: { botToken: ['xoxb', '1234567890', 'ABCDEFGHIJKLMNOP'].join('-') },
     });
     const findings = auditChannelTokens(content, 'config.json');
     expect(findings.some(f => f.id?.includes('slack'))).toBe(true);
@@ -299,15 +299,15 @@ describe('auditChannelTokens — unencrypted token detection', () => {
 
 // ─── 5. Integration Tests (scanner.scan) ─────────────────────────────────────
 
-describe('openclawConfigAuditor.scan — integration', () => {
+describe('tetoraConfigAuditor.scan — integration', () => {
   it('has correct name and description', () => {
-    expect(openclawConfigAuditor.name).toBe('OpenClaw Config Auditor');
-    expect(openclawConfigAuditor.description).toBeTruthy();
+    expect(tetoraConfigAuditor.name).toBe('Tetora Config Auditor');
+    expect(tetoraConfigAuditor.description).toBeTruthy();
   });
 
-  it('scans a directory with a vulnerable openclaw.json', async () => {
-    // Create a fake openclaw.json with security issues
-    const configPath = path.join(TEMP_DIR, 'openclaw.json');
+  it('scans a directory with a vulnerable tetora.json', async () => {
+    // Create a fake tetora.json with security issues
+    const configPath = path.join(TEMP_DIR, 'tetora.json');
     fs.writeFileSync(configPath, JSON.stringify({
       tools: {
         exec: { security: 'full' },
@@ -320,8 +320,8 @@ describe('openclawConfigAuditor.scan — integration', () => {
       },
     }));
 
-    const result = await openclawConfigAuditor.scan(TEMP_DIR);
-    expect(result.scanner).toBe('OpenClaw Config Auditor');
+    const result = await tetoraConfigAuditor.scan(TEMP_DIR);
+    expect(result.scanner).toBe('Tetora Config Auditor');
     expect(result.findings.length).toBeGreaterThan(0);
     expect(result.duration).toBeGreaterThanOrEqual(0);
 
@@ -357,7 +357,7 @@ describe('openclawConfigAuditor.scan — integration', () => {
       ],
     }));
 
-    const result = await openclawConfigAuditor.scan(TEMP_DIR);
+    const result = await tetoraConfigAuditor.scan(TEMP_DIR);
     const cronFinding = result.findings.find(f => f.id?.includes('OC-003'));
     expect(cronFinding).toBeDefined();
     expect(cronFinding!.severity).toBe('high');
@@ -371,24 +371,24 @@ describe('openclawConfigAuditor.scan — integration', () => {
     const cleanDir = path.join(TEMP_DIR, 'clean');
     fs.mkdirSync(cleanDir, { recursive: true });
 
-    const result = await openclawConfigAuditor.scan(cleanDir);
-    // Findings may come from ~/.openclaw if it exists, but that's OK in CI
+    const result = await tetoraConfigAuditor.scan(cleanDir);
+    // Findings may come from ~/.tetora if it exists, but that's OK in CI
     // The scanner should not crash
-    expect(result.scanner).toBe('OpenClaw Config Auditor');
+    expect(result.scanner).toBe('Tetora Config Auditor');
 
     fs.rmdirSync(cleanDir);
   });
 
   it('all findings have confidence set to definite', async () => {
-    const configPath = path.join(TEMP_DIR, 'openclaw.json');
+    const configPath = path.join(TEMP_DIR, 'tetora.json');
     fs.writeFileSync(configPath, JSON.stringify({
       tools: { exec: { security: 'full' } },
     }));
 
-    const result = await openclawConfigAuditor.scan(TEMP_DIR);
+    const result = await tetoraConfigAuditor.scan(TEMP_DIR);
     for (const finding of result.findings) {
       // Only check findings from our scanner
-      if (finding.scanner === 'openclaw-config-auditor') {
+      if (finding.scanner === 'tetora-config-auditor') {
         expect(finding.confidence).toBe('definite');
       }
     }

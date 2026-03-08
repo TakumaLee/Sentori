@@ -4,9 +4,9 @@ import { ScannerModule, ScanResult, Finding, ScannerOptions } from '../types';
 import { findConfigFiles, readFileContent, isJsonFile, tryParseJson } from '../utils/file-utils';
 
 /**
- * OpenClaw Config Auditor
+ * Tetora Config Auditor
  *
- * Scans OpenClaw-specific configuration files for security risks:
+ * Scans Tetora-specific configuration files for security risks:
  *   1. API key / secret leakage (sk-ant-, sk-proj-, ANTHROPIC_API_KEY, etc.)
  *   2. Overly broad tool permissions (exec security: "full")
  *   3. Unsafe cron payloads (shell injection patterns)
@@ -15,26 +15,26 @@ import { findConfigFiles, readFileContent, isJsonFile, tryParseJson } from '../u
 
 // ─── File name filters ───────────────────────────────────────────────────────
 
-const OPENCLAW_CONFIG_FILENAMES = new Set([
-  'openclaw.json',
+const TETORA_CONFIG_FILENAMES = new Set([
+  'tetora.json',
   'config.json',
   'auth-profiles.json',
   'auth.json',
 ]);
 
-const OPENCLAW_CRON_FILENAMES = new Set([
+const TETORA_CRON_FILENAMES = new Set([
   'jobs.json',
 ]);
 
-function isOpenClawConfigFile(filePath: string): boolean {
+function isTetoraConfigFile(filePath: string): boolean {
   const basename = path.basename(filePath).toLowerCase();
-  return OPENCLAW_CONFIG_FILENAMES.has(basename);
+  return TETORA_CONFIG_FILENAMES.has(basename);
 }
 
-function isOpenClawCronFile(filePath: string): boolean {
+function isTetoraCronFile(filePath: string): boolean {
   const basename = path.basename(filePath).toLowerCase();
   // Must be in a cron directory
-  return OPENCLAW_CRON_FILENAMES.has(basename) && /[/\\]cron[/\\]/.test(filePath);
+  return TETORA_CRON_FILENAMES.has(basename) && /[/\\]cron[/\\]/.test(filePath);
 }
 
 // ─── API Key Patterns ─────────────────────────────────────────────────────────
@@ -183,9 +183,9 @@ const SHELL_INJECTION_PATTERNS: Array<{ id: string; label: string; regex: RegExp
 
 // ─── Main Scanner ─────────────────────────────────────────────────────────────
 
-export const openclawConfigAuditor: ScannerModule = {
-  name: 'OpenClaw Config Auditor',
-  description: 'Scans OpenClaw agent config files for API key leakage, overly broad tool permissions, unsafe cron payloads, and unencrypted channel tokens',
+export const tetoraConfigAuditor: ScannerModule = {
+  name: 'Tetora Config Auditor',
+  description: 'Scans Tetora agent config files for API key leakage, overly broad tool permissions, unsafe cron payloads, and unencrypted channel tokens',
 
   async scan(targetPath: string, options?: ScannerOptions): Promise<ScanResult> {
     const start = Date.now();
@@ -194,21 +194,21 @@ export const openclawConfigAuditor: ScannerModule = {
     // 1. Collect files to scan from the target path
     const allFiles = await findConfigFiles(targetPath, options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns);
 
-    const configFiles = allFiles.filter(f => isOpenClawConfigFile(f));
-    const cronFiles = allFiles.filter(f => isOpenClawCronFile(f));
+    const configFiles = allFiles.filter(f => isTetoraConfigFile(f));
+    const cronFiles = allFiles.filter(f => isTetoraCronFile(f));
 
-    // 2. Also include ~/.openclaw/openclaw.json and ~/.openclaw/cron/jobs.json
+    // 2. Also include ~/.tetora/tetora.json and ~/.tetora/cron/jobs.json
     //    if the target path is NOT already the openclaw directory
     const homedir = process.env.HOME || process.env.USERPROFILE || '';
-    const openclawDir = path.join(homedir, '.openclaw');
-    const wellKnownConfig = path.join(openclawDir, 'openclaw.json');
-    const wellKnownCron = path.join(openclawDir, 'cron', 'jobs.json');
-    const wellKnownAuthProfiles = path.join(openclawDir, 'agents', 'main', 'agent', 'auth-profiles.json');
+    const tetoraDir = path.join(homedir, '.tetora');
+    const wellKnownConfig = path.join(tetoraDir, 'tetora.json');
+    const wellKnownCron = path.join(tetoraDir, 'cron', 'jobs.json');
+    const wellKnownAuthProfiles = path.join(tetoraDir, 'agents', 'main', 'agent', 'auth-profiles.json');
 
     const extraConfigs: string[] = [];
     const extraCrons: string[] = [];
 
-    if (!targetPath.startsWith(openclawDir)) {
+    if (!targetPath.startsWith(tetoraDir)) {
       if (fs.existsSync(wellKnownConfig) && !configFiles.includes(wellKnownConfig)) {
         extraConfigs.push(wellKnownConfig);
       }
@@ -270,7 +270,7 @@ export const openclawConfigAuditor: ScannerModule = {
     for (const f of deduped) f.confidence = 'definite';
 
     return {
-      scanner: 'OpenClaw Config Auditor',
+      scanner: 'Tetora Config Auditor',
       findings: deduped,
       scannedFiles: allConfigFiles.length + allCronFiles.length,
       duration: Date.now() - start,
@@ -291,7 +291,7 @@ export function auditApiKeys(content: string, filePath: string): Finding[] {
 
       findings.push({
         id: pattern.id,
-        scanner: 'openclaw-config-auditor',
+        scanner: 'tetora-config-auditor',
         severity: pattern.severity,
         title: `Hardcoded ${pattern.label} detected in config`,
         description: `A ${pattern.label} was found directly in the configuration file: ${snippet}. Hardcoded secrets can be extracted by anyone with file access or who compromises the file.`,
@@ -341,7 +341,7 @@ export function auditToolPermissions(config: Record<string, unknown>, filePath: 
       if (sc.security === 'full') {
         findings.push({
           id: `OC-002-mcp-full-${serverName}`,
-          scanner: 'openclaw-config-auditor',
+          scanner: 'tetora-config-auditor',
           severity: 'high',
           title: `MCP server "${serverName}" has unrestricted security mode`,
           description: `The MCP server "${serverName}" is configured with security: "full", which grants the agent unrestricted tool access. This expands the attack surface significantly.`,
@@ -369,7 +369,7 @@ function checkToolsSecurity(
     if (security === 'full') {
       findings.push({
         id: `OC-002-exec-full`,
-        scanner: 'openclaw-config-auditor',
+        scanner: 'tetora-config-auditor',
         severity: 'high',
         title: 'Exec tool has unrestricted security mode (security: "full")',
         description: `The exec tool at "${toolPath}.exec" is configured with security: "full", granting the agent unrestricted shell command execution. If the agent is compromised or manipulated, this allows arbitrary code execution on the host.`,
@@ -383,7 +383,7 @@ function checkToolsSecurity(
     if (Array.isArray(allowlist) && allowlist.includes('*')) {
       findings.push({
         id: `OC-002-exec-wildcard`,
-        scanner: 'openclaw-config-auditor',
+        scanner: 'tetora-config-auditor',
         severity: 'high',
         title: 'Exec tool allowlist contains wildcard (*)',
         description: `The exec tool at "${toolPath}.exec" has a wildcard "*" in its allowlist, which effectively grants unrestricted command execution.`,
@@ -400,7 +400,7 @@ function checkToolsSecurity(
     if (security === 'full') {
       findings.push({
         id: `OC-002-browser-full`,
-        scanner: 'openclaw-config-auditor',
+        scanner: 'tetora-config-auditor',
         severity: 'medium',
         title: 'Browser tool has unrestricted security mode',
         description: `The browser tool at "${toolPath}.browser" is configured with security: "full". This allows unrestricted web browsing which increases the prompt injection attack surface.`,
@@ -415,7 +415,7 @@ function checkToolsSecurity(
   if (topSecurity === 'full') {
     findings.push({
       id: `OC-002-tools-full`,
-      scanner: 'openclaw-config-auditor',
+      scanner: 'tetora-config-auditor',
       severity: 'high',
       title: `Tool security set to "full" at ${toolPath}`,
       description: `The tools section at "${toolPath}" has security: "full" which grants unrestricted access to all tool capabilities.`,
@@ -465,7 +465,7 @@ export function auditCronPayloads(config: Record<string, unknown>, filePath: str
 
           findings.push({
             id: `${injPattern.id}-${jobId}`,
-            scanner: 'openclaw-config-auditor',
+            scanner: 'tetora-config-auditor',
             severity: injPattern.severity,
             title: `Cron job "${jobId}": ${injPattern.label}`,
             description: `The cron job payload for "${jobId}" contains a pattern that may indicate shell injection risk: \`${snippet}\`. If cron payload messages are constructed from external input, this could allow arbitrary command execution.`,
@@ -483,7 +483,7 @@ export function auditCronPayloads(config: Record<string, unknown>, filePath: str
         const match = msg.match(exfilUrl);
         findings.push({
           id: `OC-003-exfil-url-${jobId}`,
-          scanner: 'openclaw-config-auditor',
+          scanner: 'tetora-config-auditor',
           severity: 'high',
           title: `Cron job "${jobId}": suspicious exfiltration URL in payload`,
           description: `The cron job payload for "${jobId}" references a URL that may indicate data exfiltration: ${match?.[0].substring(0, 80)}`,
@@ -509,7 +509,7 @@ function extractCronJobs(config: Record<string, unknown>): Array<Record<string, 
     }
   }
 
-  // top-level openclaw.json cron section
+  // top-level tetora.json cron section
   const cron = config.cron as Record<string, unknown> | undefined;
   if (cron && typeof cron === 'object') {
     if (Array.isArray(cron.jobs)) {
@@ -550,7 +550,7 @@ export function auditChannelTokens(content: string, filePath: string): Finding[]
         const snippet = match ? maskSecret(match[0]) : '(detected)';
         findings.push({
           id: `${pattern.id}-cred-file`,
-          scanner: 'openclaw-config-auditor',
+          scanner: 'tetora-config-auditor',
           severity: 'medium',
           title: `${pattern.label} stored in plaintext credential file`,
           description: `A ${pattern.label} was found in plaintext in a credential file (${path.basename(filePath)}): ${snippet}. Credential files should be encrypted at rest.`,
@@ -569,7 +569,7 @@ export function auditChannelTokens(content: string, filePath: string): Finding[]
       const snippet = match ? maskSecret(match[0]) : '(detected)';
       findings.push({
         id: `${pattern.id}-config`,
-        scanner: 'openclaw-config-auditor',
+        scanner: 'tetora-config-auditor',
         severity: 'high',
         title: `${pattern.label} found in plaintext config`,
         description: `A ${pattern.label} was found in plaintext in the configuration file: ${snippet}. Hardcoded tokens can be extracted by anyone with file access or who compromises the config.`,

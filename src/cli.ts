@@ -3,10 +3,59 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import chalk from 'chalk';
+import { minimatch } from 'minimatch';
 import { createDefaultRegistry } from './index';
-import { printReport, writeJsonReport } from './utils/reporter';
+import { printReport, writeJsonReport, buildSarifReport, writeSarifReport } from './utils/reporter';
 import { calculateSummary } from './utils/scorer';
-import { ScannerModule } from './types';
+import { ScannerModule, ScanReport } from './types';
+import { loadSentoriConfig, SentoriConfig } from './config/sentori-config';
+import { customRulesScanner } from './scanners/custom-rules-scanner';
+
+// ─── .sentori.yml config application ─────────────────────────────────────────
+
+/**
+ * Apply ignore entries and severity overrides from .sentori.yml to a completed
+ * scan report. Does not mutate the input; returns a new report object.
+ */
+function applyConfig(report: ScanReport, config: SentoriConfig): ScanReport {
+  const { ignore, overrides } = config;
+
+  const results = report.results.map((result) => {
+    let findings = result.findings;
+
+    // 1. Severity overrides — must run before ignore so overrides apply to kept findings
+    if (overrides.length > 0) {
+      findings = findings.map((f) => {
+        for (const ov of overrides) {
+          if (ov.scanner !== result.scanner) continue;
+          if (ov.rule !== undefined && ov.rule !== f.rule) continue;
+          return { ...f, severity: ov.severity };
+        }
+        return f;
+      });
+    }
+
+    // 2. Ignore filters — suppress findings where ALL specified fields match
+    if (ignore.length > 0) {
+      findings = findings.filter((f) => {
+        for (const ig of ignore) {
+          const scannerMatch = ig.scanner === undefined || ig.scanner === result.scanner;
+          const ruleMatch = ig.rule === undefined || ig.rule === f.rule;
+          const fileMatch =
+            ig.file === undefined ||
+            (f.file !== undefined && minimatch(f.file, ig.file, { matchBase: false }));
+
+          if (scannerMatch && ruleMatch && fileMatch) return false; // suppress
+        }
+        return true; // keep
+      });
+    }
+
+    return { ...result, findings };
+  });
+
+  return { ...report, results };
+}
 
 // ─── Profile filtering ──────────────────────────────────────────────────────
 
@@ -67,15 +116,19 @@ function printHelp(): void {
   console.log(chalk.gray('    --help, -h         Show help'));
   console.log(chalk.gray('    --version, -v      Show version'));
   console.log(chalk.gray('    --json             Output JSON report to stdout'));
-  console.log(chalk.gray('    --output, -o FILE  Save report to file (auto-detects JSON by extension)'));
+  console.log(chalk.gray('    --format FORMAT    Output format: pretty (default), json, sarif'));
+  console.log(chalk.gray('    --output, -o FILE  Save report to file (auto-detects format by extension)'));
   console.log(chalk.gray('    --ioc PATH         Path to external IOC blocklist JSON file'));
   console.log(chalk.gray('    --deep-scan        Enable OCR scanning of image files (slow)'));
+  console.log(chalk.gray('    --profile PROFILE  Filter scanners by profile: agent (default), general, mobile'));
   console.log('');
   console.log(chalk.bold('  Examples:'));
   console.log(chalk.cyan('    npx @nexylore/sentori scan'));
   console.log(chalk.cyan('    npx @nexylore/sentori scan ./my-agent'));
   console.log(chalk.cyan('    npx @nexylore/sentori scan ./my-agent --json'));
+  console.log(chalk.cyan('    npx @nexylore/sentori scan ./my-agent --format sarif'));
   console.log(chalk.cyan('    npx @nexylore/sentori scan ./my-agent --output report.json'));
+  console.log(chalk.cyan('    npx @nexylore/sentori scan ./my-agent --output results.sarif'));
   console.log(chalk.cyan('    npx @nexylore/sentori scan ./my-agent --ioc ./custom-ioc.json'));
   console.log('');
 }
@@ -94,7 +147,16 @@ async function main(): Promise<void> {
   }
 
   // Parse flags
-  const jsonMode = args.includes('--json');
+  let outputFormat: 'pretty' | 'json' | 'sarif' = 'pretty';
+  const formatIdx = args.findIndex((a) => a === '--format');
+  if (formatIdx !== -1 && args[formatIdx + 1]) {
+    const fmt = args[formatIdx + 1];
+    if (fmt === 'json' || fmt === 'sarif') outputFormat = fmt;
+  }
+  if (args.includes('--json')) outputFormat = 'json'; // backward compat
+  const jsonMode = outputFormat === 'json';
+  const sarifMode = outputFormat === 'sarif';
+
   const deepScan = args.includes('--deep-scan');
   if (deepScan) {
     process.env.SENTORI_DEEP_SCAN = '1';
@@ -112,9 +174,21 @@ async function main(): Promise<void> {
     iocPath = args[iocIdx + 1];
   }
 
+  let profile: ProfileType = 'agent';
+  const profileIdx = args.findIndex((a) => a === '--profile');
+  if (profileIdx !== -1 && args[profileIdx + 1]) {
+    const p = args[profileIdx + 1];
+    if (p === 'agent' || p === 'general' || p === 'mobile') {
+      profile = p;
+    } else {
+      console.error(chalk.red(`  ✗ Invalid --profile value: "${p}". Must be one of: agent, general, mobile`));
+      process.exit(1);
+    }
+  }
+
   // Collect positional args (not flags or flag values)
   const flagValuePositions = new Set<number>();
-  for (const flag of ['--output', '-o', '--ioc']) {
+  for (const flag of ['--output', '-o', '--ioc', '--format', '--profile']) {
     const idx = args.findIndex((a) => a === flag);
     if (idx !== -1) flagValuePositions.add(idx + 1);
   }
@@ -140,7 +214,7 @@ async function main(): Promise<void> {
 
   const version = getVersion();
 
-  if (!jsonMode) {
+  if (!jsonMode && !sarifMode) {
     console.log('');
     console.log(chalk.bold.cyan('  🛡️  Sentori') + chalk.gray(` v${version}`));
     console.log(chalk.gray(`  Scanning: ${targetDir}`));
@@ -149,8 +223,38 @@ async function main(): Promise<void> {
 
   const registry = createDefaultRegistry(iocPath);
 
-  const report = await registry.runAll(targetDir, (step, total, name, result) => {
-    if (jsonMode) return;
+  // Apply profile filter — must happen before runAll so skipped scanners are never loaded
+  if (profile !== 'agent') {
+    const filtered = filterScannersByProfile(registry.getScanners() as import('./types').ScannerModule[], profile);
+    registry.setScanners(filtered as import('./types').Scanner[]);
+  }
+
+  // Load .sentori.yml from target directory
+  let sentoriConfig: SentoriConfig | null = null;
+  try {
+    sentoriConfig = loadSentoriConfig(targetDir);
+    if (sentoriConfig && !jsonMode && !sarifMode) {
+      const ruleCount = sentoriConfig.rules.length;
+      const ignoreCount = sentoriConfig.ignore.length;
+      const overrideCount = sentoriConfig.overrides.length;
+      if (ruleCount + ignoreCount + overrideCount > 0) {
+        console.log(chalk.gray(`  Config: ${ruleCount} rules, ${ignoreCount} ignores, ${overrideCount} overrides`));
+        console.log('');
+      }
+    }
+  } catch (err) {
+    if (!jsonMode && !sarifMode) {
+      console.warn(chalk.yellow(`  ⚠ .sentori.yml parse error: ${(err as Error).message}`));
+    }
+  }
+
+  // Register custom rules scanner if rules are defined
+  if (sentoriConfig && sentoriConfig.rules.length > 0) {
+    registry.register(customRulesScanner(sentoriConfig.rules) as unknown as import('./types').Scanner);
+  }
+
+  let report = await registry.runAll(targetDir, (step, total, name, result) => {
+    if (jsonMode || sarifMode) return;
     const pct = Math.round((step / total) * 100);
     const filled = Math.round((step / total) * 20);
     const empty = 20 - filled;
@@ -166,21 +270,32 @@ async function main(): Promise<void> {
     }
   });
 
-  // Ensure summary is populated (registry.runAll now always sets it, but be safe)
-  if (!report.summary) {
-    report.summary = calculateSummary(report.results);
+  // Apply .sentori.yml ignore filters and severity overrides
+  if (sentoriConfig && (sentoriConfig.ignore.length > 0 || sentoriConfig.overrides.length > 0)) {
+    report = applyConfig(report, sentoriConfig);
   }
+
+  // Ensure summary is populated (registry.runAll now always sets it, but be safe)
+  // Always recalculate after config application to reflect filtered findings
+  report.summary = calculateSummary(report.results);
   report.version = version;
 
-  if (jsonMode) {
-    // Output JSON to stdout
-    console.log(JSON.stringify(report, null, 2));
-  } else if (outputPath && (outputPath.endsWith('.json'))) {
-    // Save JSON to file, print summary to console
+  if (sarifMode && outputPath) {
+    // --format sarif --output file.sarif
     printReport(report);
-    writeJsonReport(report, outputPath);
+    writeSarifReport(report, outputPath);
+  } else if (sarifMode) {
+    // --format sarif → stdout
+    console.log(JSON.stringify(buildSarifReport(report), null, 2));
+  } else if (jsonMode) {
+    // --json → stdout
+    console.log(JSON.stringify(report, null, 2));
+  } else if (outputPath && outputPath.endsWith('.sarif')) {
+    // auto-detect .sarif extension
+    printReport(report);
+    writeSarifReport(report, outputPath);
   } else if (outputPath) {
-    // Save JSON to file (any extension treated as JSON)
+    // Save JSON to file
     printReport(report);
     writeJsonReport(report, outputPath);
   } else {

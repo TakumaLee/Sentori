@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { printReport, writeJsonReport } from '../src/utils/reporter';
+import { printReport, writeJsonReport, buildSarifReport, writeSarifReport } from '../src/utils/reporter';
 import { ScanReport } from '../src/types';
 
 const TEMP_DIR = path.join(__dirname, '__temp_reporter__');
@@ -317,6 +317,179 @@ describe('Reporter', () => {
 
       const content = JSON.parse(fs.readFileSync(outputPath, 'utf-8'));
       expect(content.target).toBe('/second');
+    });
+  });
+
+  // === buildSarifReport ===
+  describe('buildSarifReport', () => {
+    test('returns valid SARIF 2.1.0 structure', () => {
+      const report = makeReport();
+      const sarif = buildSarifReport(report) as Record<string, unknown>;
+      expect(sarif.version).toBe('2.1.0');
+      expect(sarif.$schema).toContain('sarif-schema-2.1.0');
+      expect(Array.isArray(sarif.runs)).toBe(true);
+      const runs = sarif.runs as Record<string, unknown>[];
+      expect(runs).toHaveLength(1);
+    });
+
+    test('tool driver contains Sentori name and version', () => {
+      const report = makeReport({ version: '0.8.1' });
+      const sarif = buildSarifReport(report) as Record<string, unknown>;
+      const runs = sarif.runs as Record<string, unknown>[];
+      const tool = runs[0].tool as Record<string, unknown>;
+      const driver = tool.driver as Record<string, unknown>;
+      expect(driver.name).toBe('Sentori');
+      expect(driver.version).toBe('0.8.1');
+    });
+
+    test('maps critical/high findings to SARIF error level', () => {
+      const report = makeReport({
+        results: [{
+          scanner: 'Scanner',
+          scannedFiles: 1,
+          duration: 10,
+          findings: [
+            { id: 'C-1', scanner: 'scanner', severity: 'critical', title: 'Crit', description: 'desc', recommendation: 'fix' },
+            { id: 'H-1', scanner: 'scanner', severity: 'high', title: 'High', description: 'desc', recommendation: 'fix' },
+          ],
+        }],
+        summary: { totalFindings: 2, critical: 1, high: 1, medium: 0, info: 0, grade: 'F', score: 20, scannedFiles: 1, duration: 10 },
+      });
+      const sarif = buildSarifReport(report) as Record<string, unknown>;
+      const runs = sarif.runs as Record<string, unknown>[];
+      const results = runs[0].results as Record<string, unknown>[];
+      expect(results[0].level).toBe('error');
+      expect(results[1].level).toBe('error');
+    });
+
+    test('maps medium findings to SARIF warning level', () => {
+      const report = makeReport({
+        results: [{
+          scanner: 'Scanner',
+          scannedFiles: 1,
+          duration: 10,
+          findings: [
+            { id: 'M-1', scanner: 'scanner', severity: 'medium', title: 'Med', description: 'desc', recommendation: 'fix' },
+          ],
+        }],
+        summary: { totalFindings: 1, critical: 0, high: 0, medium: 1, info: 0, grade: 'B', score: 80, scannedFiles: 1, duration: 10 },
+      });
+      const sarif = buildSarifReport(report) as Record<string, unknown>;
+      const runs = sarif.runs as Record<string, unknown>[];
+      const results = runs[0].results as Record<string, unknown>[];
+      expect(results[0].level).toBe('warning');
+    });
+
+    test('maps info findings to SARIF note level', () => {
+      const report = makeReport({
+        results: [{
+          scanner: 'Scanner',
+          scannedFiles: 1,
+          duration: 10,
+          findings: [
+            { id: 'I-1', scanner: 'scanner', severity: 'info', title: 'Info', description: 'desc', recommendation: 'fix' },
+          ],
+        }],
+        summary: { totalFindings: 1, critical: 0, high: 0, medium: 0, info: 1, grade: 'A+', score: 100, scannedFiles: 1, duration: 10 },
+      });
+      const sarif = buildSarifReport(report) as Record<string, unknown>;
+      const runs = sarif.runs as Record<string, unknown>[];
+      const results = runs[0].results as Record<string, unknown>[];
+      expect(results[0].level).toBe('note');
+    });
+
+    test('includes file location with line number', () => {
+      const report = makeReport({
+        results: [{
+          scanner: 'Scanner',
+          scannedFiles: 1,
+          duration: 10,
+          findings: [
+            { id: 'F-1', scanner: 'scanner', severity: 'high', title: 'Issue', description: 'desc', recommendation: 'fix', file: 'src/foo.ts', line: 42 },
+          ],
+        }],
+        summary: { totalFindings: 1, critical: 0, high: 1, medium: 0, info: 0, grade: 'A', score: 90, scannedFiles: 1, duration: 10 },
+      });
+      const sarif = buildSarifReport(report) as Record<string, unknown>;
+      const runs = sarif.runs as Record<string, unknown>[];
+      const results = runs[0].results as Record<string, unknown>[];
+      const locations = results[0].locations as Record<string, unknown>[];
+      const physLoc = (locations[0].physicalLocation as Record<string, unknown>);
+      const artifactLoc = physLoc.artifactLocation as Record<string, unknown>;
+      const region = physLoc.region as Record<string, unknown>;
+      expect(artifactLoc.uri).toBe('src/foo.ts');
+      expect(artifactLoc.uriBaseId).toBe('%SRCROOT%');
+      expect(region.startLine).toBe(42);
+    });
+
+    test('deduplicates rules', () => {
+      const report = makeReport({
+        results: [{
+          scanner: 'Scanner',
+          scannedFiles: 2,
+          duration: 10,
+          findings: [
+            { id: 'RULE-1', scanner: 'scanner', severity: 'high', title: 'Same Rule', description: 'desc', recommendation: 'fix' },
+            { id: 'RULE-1', scanner: 'scanner', severity: 'high', title: 'Same Rule', description: 'desc', recommendation: 'fix', file: 'other.ts' },
+          ],
+        }],
+        summary: { totalFindings: 2, critical: 0, high: 2, medium: 0, info: 0, grade: 'A', score: 90, scannedFiles: 2, duration: 10 },
+      });
+      const sarif = buildSarifReport(report) as Record<string, unknown>;
+      const runs = sarif.runs as Record<string, unknown>[];
+      const driver = (runs[0].tool as Record<string, unknown>).driver as Record<string, unknown>;
+      const rules = driver.rules as unknown[];
+      // Two findings with same ruleId → only one rule entry
+      expect(rules).toHaveLength(1);
+      // But two results
+      const results = runs[0].results as unknown[];
+      expect(results).toHaveLength(2);
+    });
+
+    test('no findings produces empty results array', () => {
+      const report = makeReport();
+      const sarif = buildSarifReport(report) as Record<string, unknown>;
+      const runs = sarif.runs as Record<string, unknown>[];
+      expect((runs[0].results as unknown[]).length).toBe(0);
+      expect((runs[0].artifacts as unknown[]).length).toBe(0);
+    });
+  });
+
+  // === writeSarifReport ===
+  describe('writeSarifReport', () => {
+    let consoleSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+    });
+
+    afterEach(() => {
+      consoleSpy.mockRestore();
+    });
+
+    test('writes valid SARIF JSON to file', () => {
+      const report = makeReport({ version: '0.8.1' });
+      const outputPath = path.join(TEMP_DIR, 'report.sarif');
+      writeSarifReport(report, outputPath);
+
+      expect(fs.existsSync(outputPath)).toBe(true);
+      const content = JSON.parse(fs.readFileSync(outputPath, 'utf-8'));
+      expect(content.version).toBe('2.1.0');
+    });
+
+    test('creates parent directories if missing', () => {
+      const report = makeReport();
+      const outputPath = path.join(TEMP_DIR, 'sub', 'sarif', 'report.sarif');
+      writeSarifReport(report, outputPath);
+      expect(fs.existsSync(outputPath)).toBe(true);
+    });
+
+    test('prints confirmation message', () => {
+      const report = makeReport();
+      const outputPath = path.join(TEMP_DIR, 'confirm.sarif');
+      writeSarifReport(report, outputPath);
+      const output = consoleSpy.mock.calls.map(c => c[0]).join('\n');
+      expect(output).toContain('SARIF report saved');
     });
   });
 });

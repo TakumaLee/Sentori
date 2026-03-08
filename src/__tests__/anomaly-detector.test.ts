@@ -308,10 +308,11 @@ describe('RULE-005: data_exfiltration', () => {
 
   test('does NOT trigger for args exactly at 10240 bytes (boundary: must be strictly greater)', () => {
     // JSON.stringify({payload: "x".repeat(N)}) = N + 13 chars ({"payload":"..."})
-    // We want the total to be exactly 10240:
+    // We want the total to be exactly 10240.
+    // Use a payload with a non-base64 char ('!') so only the size check applies.
     const wrapperLength = JSON.stringify({ payload: '' }).length; // 13
     const targetArgSize = 10_240 - wrapperLength; // 10227
-    const payload = 'x'.repeat(targetArgSize);
+    const payload = 'x'.repeat(targetArgSize - 1) + '!'; // '!' is not in base64 alphabet
     const event = makeEvent('borderline', { args: { payload } });
     expect(JSON.stringify(event.args).length).toBe(10_240);
 
@@ -338,6 +339,55 @@ describe('RULE-005: data_exfiltration', () => {
 
   test('returns empty array for empty input', () => {
     expect(RULE_005.detect([])).toEqual([]);
+  });
+
+  // base64 detection
+  test('triggers when args contain a base64-encoded string (≥ 100 chars)', () => {
+    const encoded = 'A'.repeat(120); // 120 base64-alphabet chars, well within base64 charset
+    const event = makeEvent('sendData', { args: { payload: encoded } });
+    const matches = RULE_005.detect([event]);
+
+    expect(matches).toHaveLength(1);
+    expect(matches[0].ruleId).toBe('RULE-005');
+    expect(matches[0].type).toBe('data_exfiltration');
+    expect(matches[0].severity).toBe('critical');
+    expect(matches[0].description).toContain('base64');
+    expect(matches[0].relatedEvents).toContain(event.id);
+    expect(matches[0].score).toBeGreaterThan(0);
+  });
+
+  test('does NOT trigger for short base64-like strings (< 100 chars)', () => {
+    const shortEncoded = 'A'.repeat(99);
+    const event = makeEvent('normalTool', { args: { token: shortEncoded } });
+    const matches = RULE_005.detect([event]);
+    expect(matches).toHaveLength(0);
+  });
+
+  test('triggers for base64 string nested inside args object', () => {
+    const encoded = 'B'.repeat(150);
+    const event = makeEvent('upload', { args: { nested: { deep: { payload: encoded } } } });
+    const matches = RULE_005.detect([event]);
+
+    expect(matches).toHaveLength(1);
+    expect(matches[0].description).toContain('base64');
+  });
+
+  test('does NOT trigger for regular text with spaces and punctuation', () => {
+    const text = 'This is a normal log message with spaces, punctuation! And numbers 12345.';
+    const event = makeEvent('log', { args: { message: text } });
+    const matches = RULE_005.detect([event]);
+    expect(matches).toHaveLength(0);
+  });
+
+  test('reports a single match when event triggers both size and base64 checks', () => {
+    // 11000 'A's: oversized AND matches base64 pattern
+    const encoded = 'A'.repeat(11_000);
+    const event = makeEvent('exfil', { args: { data: encoded } });
+    const matches = RULE_005.detect([event]);
+
+    expect(matches).toHaveLength(1);
+    expect(matches[0].description).toContain('10KB');
+    expect(matches[0].description).toContain('base64');
   });
 });
 

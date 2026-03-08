@@ -53,6 +53,20 @@ const DEFAULT_IGNORE = [
   '**/Extensions/**',
   // Session records (data, not code)
   '**/sessions/**',
+  // Runtime / data directories (synced with CACHE_DATA_PATTERNS below)
+  '**/vault/**',
+  '**/uploads/**',
+  '**/output/**',
+  '**/outputs/**',
+  '**/data/**',
+  '**/logs/**',
+  '**/dbs/**',
+  '**/history/**',
+  '**/runtime/**',
+  '**/snapshots/**',
+  '**/crawl/**',
+  '**/scraped/**',
+  '**/downloaded/**',
 ];
 
 /**
@@ -102,12 +116,17 @@ const CACHE_DATA_PATTERNS = [
   /[/\\]data[/\\]/i,
   /[/\\]knowledge[/\\]/i,
   /[/\\]logs?[/\\]/i,
-  /[/\\]output[/\\]/i,
+  /[/\\]outputs?[/\\]/i,   // covers both output/ and outputs/
   /[/\\]results?[/\\]/i,
   /[/\\]snapshots?[/\\]/i,
   /[/\\]crawl[/\\]/i,
   /[/\\]scraped?[/\\]/i,
   /[/\\]downloaded?[/\\]/i,
+  /[/\\]sessions?[/\\]/i,  // AI session conversation history
+  /[/\\]runtime[/\\]/i,    // runtime state files
+  /[/\\]vault[/\\]/i,      // encrypted backup files
+  /[/\\]dbs?[/\\]/i,       // database directories
+  /[/\\]history[/\\]/i,    // history files
 ];
 
 export function isCacheOrDataFile(filePath: string): boolean {

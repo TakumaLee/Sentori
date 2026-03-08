@@ -59,8 +59,32 @@ const SEMVER_STRICT = /^\d+\.\d+\.\d+$/;
 // Suspicious pre-release suffixes
 const SUSPICIOUS_SUFFIX = /(-beta|-alpha|-rc|-dev)(\.\d+)?$/i;
 
-// Suspicious .0.0 ending (often placeholder/default)
-const SUSPICIOUS_ZERO = /\.0\.0$/;
+// Only flag truly placeholder version (all-zero): 0.0.0
+// Previously used /\.0\.0$/ which caused high false-positive rate on normal
+// releases like 1.0.0, 2.0.0, 10.0.0, etc.
+const SUSPICIOUS_ZERO = /^0\.0\.0$/;
+
+// Packages where pre-release versions are common and expected in dev environments.
+// These are still reported (so intentional usage is visible) but with reduced severity.
+const PRERELEASE_COMMON_PACKAGES = new Set([
+  'typescript',
+  'next',
+  'react',
+  'react-dom',
+  'vue',
+  'nuxt',
+  'vite',
+  'webpack',
+  'rollup',
+  'esbuild',
+  'eslint',
+  'prettier',
+  '@angular/core',
+  '@angular/cli',
+  '@babel/core',
+  '@babel/preset-env',
+  '@vue/compiler-sfc',
+]);
 
 // ---------------------------------------------------------------------------
 // Version Conflict Detection (Phase 2 Core)
@@ -89,17 +113,27 @@ export function detectVersionConflicts(result: ParsedLockResult): ConflictFindin
       });
     }
 
-    // 2. suspicious-version: pre-release suffix or .0.0 ending
+    // 2. suspicious-version: pre-release suffix or true placeholder (0.0.0)
+    //
+    // Noise-reduction changes (2026-02):
+    //  - SUSPICIOUS_ZERO now matches only "0.0.0" (true placeholder), NOT all x.0.0
+    //  - Severity downgraded from 'high' → 'medium' (pre-release is common in dev)
+    //  - Packages in PRERELEASE_COMMON_PACKAGES are expected to ship pre-release;
+    //    flagged at 'low' severity to keep signal without drowning dashboards.
     const suspiciousVersions = versions.filter(
       (v) => SUSPICIOUS_SUFFIX.test(v) || SUSPICIOUS_ZERO.test(v),
     );
     if (suspiciousVersions.length > 0) {
+      const isCommonPackage = PRERELEASE_COMMON_PACKAGES.has(packageName);
       findings.push({
         packageName,
         versions: suspiciousVersions,
         conflictType: 'suspicious-version',
-        severity: 'high',
-        details: `Suspicious version(s) detected: ${suspiciousVersions.join(', ')}`,
+        // Common tooling packages (typescript, next, vite…) often ship pre-release;
+        // report at 'info' level to reduce dashboard noise while keeping visibility.
+        // Unknown packages get 'medium' (down from 'high' — false-positive reduction).
+        severity: isCommonPackage ? 'info' : 'medium',
+        details: `Suspicious version(s) detected: ${suspiciousVersions.join(', ')}${isCommonPackage ? ' (common package — pre-release may be intentional)' : ''}`,
       });
     }
 
@@ -552,8 +586,11 @@ const CONFLICT_RULE_MAP: Record<
     id: 'PKGATE-002',
     title: 'Suspicious pre-release or placeholder version detected',
     recommendation:
-      'Avoid using pre-release versions (-alpha, -beta, -rc, -dev) or placeholder .0.0 versions ' +
-      'in production. Pin to a stable release and verify the package integrity.',
+      'Avoid shipping pre-release versions (-alpha, -beta, -rc, -dev) or the all-zero ' +
+      'placeholder version (0.0.0) in production lock files. ' +
+      'Pin to a stable release and verify package integrity. ' +
+      'For well-known tooling packages (e.g. typescript, next, vite) pre-release usage ' +
+      'is common and flagged at lower severity — review intentional vs. accidental use.',
   },
   'pinned-mismatch': {
     id: 'PKGATE-003',

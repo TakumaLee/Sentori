@@ -191,6 +191,30 @@ export const mcpToolManifestScanner: ScannerModule = {
       }
     }
 
+    // --- Detection 4: Cross-File Tool Redefinition ---
+    for (const [toolName, registrations] of globalToolRegistry.entries()) {
+      const distinctFiles = [...new Set(registrations.map(r => r.filePath))];
+      if (distinctFiles.length > 1) {
+        const entries = registrations.map(r => `${r.serverName} (${r.filePath})`).join(', ');
+        findings.push({
+          id: `TOOL-XFILE-REDEF-${toolName}`,
+          scanner: 'mcp-tool-manifest-scanner',
+          severity: 'high',
+          rule: 'tool-redefinition-attack',
+          title: `Cross-file tool redefinition: "${toolName}" declared in multiple config files`,
+          description:
+            `The tool "${toolName}" is declared across ${distinctFiles.length} separate config files: [${entries}]. ` +
+            `A malicious config file loaded later can silently shadow a trusted server's tool, ` +
+            `intercepting calls and potentially exfiltrating sensitive data.`,
+          file: distinctFiles[0],
+          recommendation:
+            'Ensure each tool name is unique across all MCP configurations. ' +
+            'Use namespaced tool names (e.g., "serverA__read_file") to avoid collisions. ' +
+            'Audit third-party config files before merging them into your environment.',
+        });
+      }
+    }
+
     // All findings have definite confidence (config-based)
     for (const f of findings) f.confidence = 'definite';
 

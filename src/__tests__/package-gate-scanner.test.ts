@@ -497,7 +497,8 @@ describe('detectVersionConflicts', () => {
       const findings = detectVersionConflicts(result);
       const sv = findings.filter((f) => f.conflictType === 'suspicious-version');
       expect(sv).toHaveLength(1);
-      expect(sv[0].severity).toBe('high');
+      // Severity downgraded from 'high' → 'medium' (noise-reduction: pre-release is common in dev)
+      expect(sv[0].severity).toBe('medium');
       expect(sv[0].versions).toContain('1.0.0-beta');
     });
 
@@ -534,16 +535,29 @@ describe('detectVersionConflicts', () => {
       expect(sv).toHaveLength(1);
     });
 
-    test('flags version ending in .0.0', () => {
+    test('flags true placeholder version 0.0.0', () => {
+      // Only "0.0.0" (all-zero) is flagged — normal releases like 2.0.0 are NOT suspicious
       const result: ParsedLockResult = {
         lockType: 'npm',
         dependencies: [],
-        rawVersionMap: { placeholder: ['2.0.0'] },
+        rawVersionMap: { placeholder: ['0.0.0'] },
       };
       const findings = detectVersionConflicts(result);
       const sv = findings.filter((f) => f.conflictType === 'suspicious-version');
       expect(sv).toHaveLength(1);
       expect(sv[0].packageName).toBe('placeholder');
+    });
+
+    test('does NOT flag normal major releases like 2.0.0 as suspicious', () => {
+      // Previously /\\.0\\.0$/ caused massive false positives on 2.0.0, 10.0.0 etc.
+      const result: ParsedLockResult = {
+        lockType: 'npm',
+        dependencies: [],
+        rawVersionMap: { realrelease: ['2.0.0'] },
+      };
+      const findings = detectVersionConflicts(result);
+      const sv = findings.filter((f) => f.conflictType === 'suspicious-version');
+      expect(sv).toHaveLength(0);
     });
 
     test('does NOT flag normal versions like 1.2.3', () => {
@@ -740,7 +754,8 @@ describe('PackageGateScanner.scan()', () => {
 
     const suspiciousFindings = result.findings.filter((f) => f.id === 'PKGATE-002');
     expect(suspiciousFindings.length).toBeGreaterThan(0);
-    expect(suspiciousFindings[0].severity).toBe('high');
+    // Severity reduced from 'high' to 'medium' (noise-reduction for suspicious-version)
+    expect(suspiciousFindings[0].severity).toBe('medium');
   });
 
   test('scans findings have required fields', async () => {

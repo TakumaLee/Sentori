@@ -64,7 +64,7 @@ describe('Secret Leak Scanner — Enhanced Patterns (v0.3.0)', () => {
 
     it('should detect bot token in JSON', () => {
       const content = '{"token": "9876543210:AAxxyyzzAABBCCDDEEFFGGHHIIJJKKLLMM"}';
-      const findings = scanForSecrets(content, 'openclaw.json');
+      const findings = scanForSecrets(content, 'tetora.json');
       const f = findings.find(f => f.description.includes('Telegram bot token'));
       expect(f).toBeDefined();
     });
@@ -193,7 +193,7 @@ describe('Secret Leak Scanner — Enhanced Patterns (v0.3.0)', () => {
     "token": "1234567890:AABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPQQs"
   }]
 }`;
-      const findings = scanForSecrets(content, 'openclaw.json');
+      const findings = scanForSecrets(content, 'tetora.json');
       const telegramFindings = findings.filter(f => f.description.includes('Telegram bot token'));
       expect(telegramFindings.length).toBeGreaterThanOrEqual(1);
     });

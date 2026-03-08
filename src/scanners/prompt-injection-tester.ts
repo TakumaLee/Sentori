@@ -207,9 +207,9 @@ const SYSTEM_PROMPT_FILE_PATTERNS = [
  * design and should not be flagged as injection risks.
  */
 const WORKSPACE_CONFIG_PATTERNS = [
-  /[/\\]\.openclaw[/\\]workspace[/\\]SOUL\.md$/i,
-  /[/\\]\.openclaw[/\\]workspace[/\\]rules[/\\]/i,
-  /[/\\]\.openclaw[/\\]workspace[/\\]memory[/\\]/i,
+  /[/\\]\.tetora[/\\]workspace[/\\]SOUL\.md$/i,
+  /[/\\]\.tetora[/\\]workspace[/\\]rules[/\\]/i,
+  /[/\\]\.tetora[/\\]workspace[/\\]memory[/\\]/i,
 ];
 
 export function isSystemPromptFile(filePath: string): boolean {

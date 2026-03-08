@@ -8,7 +8,7 @@ describe('Agent Config Auditor', () => {
     // AC-001: Gateway exposed to network
     it('should detect bind 0.0.0.0 as critical', () => {
       const config = { gateway: { bind: '0.0.0.0', port: 8080 } };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       const f = findings.find(f => f.title === 'Gateway exposed to network');
       expect(f).toBeDefined();
       expect(f!.severity).toBe('critical');
@@ -16,7 +16,7 @@ describe('Agent Config Auditor', () => {
 
     it('should detect non-loopback bind address', () => {
       const config = { gateway: { bind: '192.168.1.100', port: 8080 } };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       const f = findings.find(f => f.title === 'Gateway exposed to network');
       expect(f).toBeDefined();
       expect(f!.severity).toBe('critical');
@@ -24,14 +24,14 @@ describe('Agent Config Auditor', () => {
 
     it('should not flag bind 127.0.0.1', () => {
       const config = { gateway: { bind: '127.0.0.1', port: 8080, token: 'abc' } };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       const f = findings.find(f => f.title === 'Gateway exposed to network');
       expect(f).toBeUndefined();
     });
 
     it('should not flag bind localhost', () => {
       const config = { gateway: { bind: 'localhost', port: 8080, token: 'abc' } };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       const f = findings.find(f => f.title === 'Gateway exposed to network');
       expect(f).toBeUndefined();
     });
@@ -39,7 +39,7 @@ describe('Agent Config Auditor', () => {
     // AC-002: No gateway authentication
     it('should detect missing auth on gateway', () => {
       const config = { gateway: { bind: '127.0.0.1', port: 8080 } };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       const f = findings.find(f => f.title === 'No gateway authentication');
       expect(f).toBeDefined();
       expect(f!.severity).toBe('critical');
@@ -47,14 +47,14 @@ describe('Agent Config Auditor', () => {
 
     it('should not flag when token is present', () => {
       const config = { gateway: { bind: '127.0.0.1', port: 8080, token: 'my-secret-token' } };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       const f = findings.find(f => f.title === 'No gateway authentication');
       expect(f).toBeUndefined();
     });
 
     it('should not flag when auth object is present', () => {
       const config = { gateway: { port: 8080 }, auth: { type: 'bearer', token: 'xxx' } };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       const f = findings.find(f => f.title === 'No gateway authentication');
       expect(f).toBeUndefined();
     });
@@ -65,7 +65,7 @@ describe('Agent Config Auditor', () => {
         gateway: { port: 8080, token: 'abc' },
         channels: [{ name: 'telegram', type: 'telegram' }],
       };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       const f = findings.find(f => f.title === 'No sender restriction on messaging channel');
       expect(f).toBeDefined();
       expect(f!.severity).toBe('critical');
@@ -76,7 +76,7 @@ describe('Agent Config Auditor', () => {
         gateway: { port: 8080, token: 'abc' },
         channels: [{ name: 'telegram', type: 'telegram', allowFrom: ['123456'] }],
       };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       const f = findings.find(f => f.title === 'No sender restriction on messaging channel');
       expect(f).toBeUndefined();
     });
@@ -85,7 +85,7 @@ describe('Agent Config Auditor', () => {
       const config = {
         channels: [{ name: 'discord', allowedUsers: ['user1'] }],
       };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       const f = findings.find(f => f.title === 'No sender restriction on messaging channel');
       expect(f).toBeUndefined();
     });
@@ -95,7 +95,7 @@ describe('Agent Config Auditor', () => {
       const config = {
         channels: [{ name: 'telegram', dmPolicy: 'open', allowFrom: ['123'] }],
       };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       const f = findings.find(f => f.title === 'DM policy allows anyone to message');
       expect(f).toBeDefined();
       expect(f!.severity).toBe('high');
@@ -103,7 +103,7 @@ describe('Agent Config Auditor', () => {
 
     it('should detect top-level dmPolicy open', () => {
       const config = { dmPolicy: 'open' };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       const f = findings.find(f => f.title === 'DM policy allows anyone to message');
       expect(f).toBeDefined();
       expect(f!.severity).toBe('high');
@@ -113,7 +113,7 @@ describe('Agent Config Auditor', () => {
       const config = {
         channels: [{ name: 'telegram', dmPolicy: 'restricted', allowFrom: ['123'] }],
       };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       const f = findings.find(f => f.title === 'DM policy allows anyone to message');
       expect(f).toBeUndefined();
     });
@@ -123,7 +123,7 @@ describe('Agent Config Auditor', () => {
       const config = {
         botToken: '1234567890:AABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPQQs',
       };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       const f = findings.find(f => f.title === 'Bot token in plaintext config');
       expect(f).toBeDefined();
       expect(f!.severity).toBe('high');
@@ -133,7 +133,7 @@ describe('Agent Config Auditor', () => {
       const config = {
         apiKey: 'sk-ant-api03-AABBCCDDEE1234567890abcdefghij',
       };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       const f = findings.find(f => f.title === 'Bot token in plaintext config');
       expect(f).toBeDefined();
     });
@@ -142,7 +142,7 @@ describe('Agent Config Auditor', () => {
       const config = {
         apiKey: 'sk-proj-AABBCCDDEE1234567890abcdefghij',
       };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       const f = findings.find(f => f.title === 'Bot token in plaintext config');
       expect(f).toBeDefined();
     });
@@ -150,7 +150,7 @@ describe('Agent Config Auditor', () => {
     // AC-006: Default port
     it('should detect default port 18789', () => {
       const config = { gateway: { port: 18789, token: 'abc' } };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       const f = findings.find(f => f.title === 'Using default port');
       expect(f).toBeDefined();
       expect(f!.severity).toBe('medium');
@@ -158,7 +158,7 @@ describe('Agent Config Auditor', () => {
 
     it('should not flag non-default port', () => {
       const config = { gateway: { port: 9999, token: 'abc' } };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       const f = findings.find(f => f.title === 'Using default port');
       expect(f).toBeUndefined();
     });
@@ -166,7 +166,7 @@ describe('Agent Config Auditor', () => {
     // AC-007: No logging
     it('should detect missing logging config', () => {
       const config = { gateway: { port: 8080, token: 'abc' } };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       const f = findings.find(f => f.title === 'No logging configured');
       expect(f).toBeDefined();
       expect(f!.severity).toBe('medium');
@@ -174,7 +174,7 @@ describe('Agent Config Auditor', () => {
 
     it('should not flag when logging is present', () => {
       const config = { gateway: { port: 8080, token: 'abc' }, logging: { level: 'info' } };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       const f = findings.find(f => f.title === 'No logging configured');
       expect(f).toBeUndefined();
     });
@@ -182,7 +182,7 @@ describe('Agent Config Auditor', () => {
     // AC-008: No redactSensitive
     it('should detect missing redactSensitive', () => {
       const config = { gateway: { port: 8080, token: 'abc' } };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       const f = findings.find(f => f.title === 'Sensitive data not redacted in logs');
       expect(f).toBeDefined();
       expect(f!.severity).toBe('medium');
@@ -190,7 +190,7 @@ describe('Agent Config Auditor', () => {
 
     it('should not flag when redactSensitive is set', () => {
       const config = { gateway: { port: 8080, token: 'abc' }, redactSensitive: true };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       const f = findings.find(f => f.title === 'Sensitive data not redacted in logs');
       expect(f).toBeUndefined();
     });
@@ -200,7 +200,7 @@ describe('Agent Config Auditor', () => {
       const config = {
         channels: [{ name: 'telegram', groupPolicy: 'open', allowFrom: ['123'] }],
       };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       const f = findings.find(f => f.title === 'Group policy not restricted');
       expect(f).toBeDefined();
       expect(f!.severity).toBe('medium');
@@ -208,7 +208,7 @@ describe('Agent Config Auditor', () => {
 
     it('should detect top-level groupPolicy open', () => {
       const config = { groupPolicy: 'open' };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       const f = findings.find(f => f.title === 'Group policy not restricted');
       expect(f).toBeDefined();
     });
@@ -217,7 +217,7 @@ describe('Agent Config Auditor', () => {
       const config = {
         channels: [{ name: 'telegram', groupPolicy: 'allowlist', allowFrom: ['123'] }],
       };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       const f = findings.find(f => f.title === 'Group policy not restricted');
       expect(f).toBeUndefined();
     });
@@ -229,7 +229,7 @@ describe('Agent Config Auditor', () => {
         channels: [{ name: 'telegram', dmPolicy: 'open', groupPolicy: 'open' }],
         botToken: '1234567890:AABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPQQs',
       };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       expect(findings.length).toBeGreaterThanOrEqual(5);
       const criticals = findings.filter(f => f.severity === 'critical');
       expect(criticals.length).toBeGreaterThanOrEqual(2);
@@ -243,7 +243,7 @@ describe('Agent Config Auditor', () => {
         logging: { level: 'info' },
         redactSensitive: true,
       };
-      const findings = auditAgentConfig(config, 'openclaw.json');
+      const findings = auditAgentConfig(config, 'tetora.json');
       // Should have zero or very few findings
       const nonInfo = findings.filter(f => f.severity !== 'info');
       expect(nonInfo.length).toBe(0);
@@ -261,9 +261,9 @@ describe('Agent Config Auditor', () => {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     });
 
-    it('should scan openclaw.json files', async () => {
+    it('should scan tetora.json files', async () => {
       fs.writeFileSync(
-        path.join(tmpDir, 'openclaw.json'),
+        path.join(tmpDir, 'tetora.json'),
         JSON.stringify({
           gateway: { bind: '0.0.0.0', port: 18789 },
           channels: [{ name: 'telegram' }],

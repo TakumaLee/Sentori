@@ -210,6 +210,111 @@ function printSummaryBar(report: ScanReport): void {
   console.log('');
 }
 
+// ─── SARIF 2.1.0 output ──────────────────────────────────────────────────────
+
+function toSarifLevel(severity: Severity): 'error' | 'warning' | 'note' {
+  if (severity === 'critical' || severity === 'high') return 'error';
+  if (severity === 'medium') return 'warning';
+  return 'note';
+}
+
+function toRuleId(f: Finding): string {
+  if (f.id) return f.id;
+  const scanner = f.scanner.replace(/[^a-zA-Z0-9]/g, '-').toUpperCase();
+  const title = (f.title || f.rule || 'UNKNOWN').replace(/[^a-zA-Z0-9]/g, '-').toUpperCase();
+  return `${scanner}/${title}`.slice(0, 64);
+}
+
+export function buildSarifReport(report: ScanReport): object {
+  const version = report.version ?? '0.0.0';
+
+  const allFindings: Finding[] = [];
+  for (const result of report.results) {
+    for (const f of result.findings) {
+      allFindings.push(normalizeFinding(f));
+    }
+  }
+
+  // Deduplicated rules map
+  const rulesMap = new Map<string, object>();
+  for (const f of allFindings) {
+    const ruleId = toRuleId(f);
+    if (!rulesMap.has(ruleId)) {
+      rulesMap.set(ruleId, {
+        id: ruleId,
+        name: (f.title ?? 'Unknown').replace(/\s+/g, ''),
+        shortDescription: { text: f.title ?? 'Unknown' },
+        fullDescription: { text: f.description || f.title || 'Unknown' },
+        defaultConfiguration: { level: toSarifLevel(f.severity) },
+        ...(f.recommendation ? { help: { text: f.recommendation } } : {}),
+      });
+    }
+  }
+
+  const results = allFindings.map((f) => {
+    const entry: Record<string, unknown> = {
+      ruleId: toRuleId(f),
+      level: toSarifLevel(f.severity),
+      message: { text: f.description || f.title || 'Security finding detected' },
+    };
+    if (f.file) {
+      entry.locations = [
+        {
+          physicalLocation: {
+            artifactLocation: { uri: f.file.replace(/\\/g, '/'), uriBaseId: '%SRCROOT%' },
+            ...(f.line ? { region: { startLine: f.line } } : {}),
+          },
+        },
+      ];
+    }
+    return entry;
+  });
+
+  const fileSet = new Set<string>();
+  for (const f of allFindings) {
+    if (f.file) fileSet.add(f.file.replace(/\\/g, '/'));
+  }
+  const artifacts = Array.from(fileSet).map((uri) => ({
+    location: { uri, uriBaseId: '%SRCROOT%' },
+  }));
+
+  return {
+    version: '2.1.0',
+    $schema:
+      'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json',
+    runs: [
+      {
+        tool: {
+          driver: {
+            name: 'Sentori',
+            version,
+            informationUri: 'https://www.npmjs.com/package/@nexylore/sentori',
+            rules: Array.from(rulesMap.values()),
+          },
+        },
+        results,
+        artifacts,
+        invocations: [
+          {
+            executionSuccessful: true,
+            commandLine: `sentori scan ${report.target}`,
+          },
+        ],
+      },
+    ],
+  };
+}
+
+export function writeSarifReport(report: ScanReport, outputPath: string): void {
+  const dir = path.dirname(outputPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(outputPath, JSON.stringify(buildSarifReport(report), null, 2), 'utf-8');
+  console.log(chalk.gray(`  📄 SARIF report saved to: ${outputPath}`));
+  console.log('');
+}
+
 export function writeJsonReport(report: ScanReport, outputPath: string): void {
   const dir = path.dirname(outputPath);
   if (!fs.existsSync(dir)) {

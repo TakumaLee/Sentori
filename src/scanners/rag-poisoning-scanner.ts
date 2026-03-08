@@ -1,14 +1,18 @@
 import { ScannerModule, ScanResult, Finding, ScannerOptions } from '../types';
-import { findFiles, readFileContent, isTestOrDocFile, isSentoriSourceFile } from '../utils/file-utils';
+import { findFiles, readFileContent, isTestOrDocFile, isSentoriSourceFile, isCacheOrDataFile } from '../utils/file-utils';
 
 /**
  * Workspace configuration directories and files that are part of the AI agent's
  * design and should not be flagged as RAG poisoning risks.
  */
 const WORKSPACE_CONFIG_PATTERNS = [
-  /[/\\]\.openclaw[/\\]workspace[/\\]SOUL\.md$/i,
-  /[/\\]\.openclaw[/\\]workspace[/\\]rules[/\\]/i,
-  /[/\\]\.openclaw[/\\]workspace[/\\]memory[/\\]/i,
+  /[/\\]\.tetora[/\\]workspace[/\\]SOUL\.md$/i,
+  /[/\\]\.tetora[/\\]workspace[/\\]rules[/\\]/i,
+  /[/\\]\.tetora[/\\]workspace[/\\]memory[/\\]/i,
+  /[/\\]\.tetora[/\\]workspace[/\\]knowledge[/\\]/i,
+  /[/\\]\.tetora[/\\]workspace[/\\]skills?[/\\]/i,
+  /[/\\]\.tetora[/\\]workspace[/\\]team[/\\]/i,
+  /[/\\]\.openclaw[/\\]workspace[/\\]/i,
 ];
 
 function isWorkspaceConfigFile(filePath: string): boolean {
@@ -125,7 +129,8 @@ export const ragPoisoningScanner: ScannerModule = {
 
     // Hidden instruction patterns (HIGH severity)
     const HIDDEN_INSTRUCTION_PATTERNS = [
-      /[\u200B-\u200F\u202A-\u202E\uFEFF]+/g, // Zero-width and RTL override characters
+      // Zero-width and RTL override characters (excluding U+200D ZWJ — legitimately used in emoji)
+      /[\u200B\u200C\u200E\u200F\u202A-\u202E\uFEFF]+/g,
       /(\s|^)<!--.*?-->\s*ignore/gis,
       /style\s*=\s*["']color:\s*(white|transparent|#fff|#ffffff|rgba\(255,\s*255,\s*255)/gi,
       /display:\s*none[^>]*>.*?(ignore|override|system)/gis,
@@ -145,11 +150,15 @@ export const ragPoisoningScanner: ScannerModule = {
       const isTestFile = isTestOrDocFile(file);
       const isSentoriSrc = isSentoriSourceFile(file);
 
-      // Skip workspace configuration files (SOUL.md, rules/, memory/)
+      // Skip workspace configuration files (SOUL.md, rules/, memory/, knowledge/, skills/)
       if (isWorkspaceConfigFile(file)) {
         // These are system design files, not RAG poisoning risks
         continue;
       }
+
+      // Skip cache/data/output/session files — they contain AI-generated content,
+      // not user-injected RAG documents. Findings here would be near-100% false positives.
+      if (isCacheOrDataFile(file)) continue;
 
       // Skip Sentori's own source (unless explicitly vendored/copied)
       if (isSentoriSrc && !options?.includeVendored) continue;

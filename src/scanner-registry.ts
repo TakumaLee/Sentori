@@ -12,6 +12,10 @@ export class ScannerRegistry {
     return [...this.scanners];
   }
 
+  setScanners(scanners: Scanner[]): void {
+    this.scanners = [...scanners];
+  }
+
   async runAll(targetDir: string, onProgress?: (step: number, total: number, scannerName: string, result?: ScanResult) => void): Promise<ScanReport> {
     const timestamp = new Date().toISOString();
     const results: ScanResult[] = [];
