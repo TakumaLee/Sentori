@@ -50,9 +50,9 @@ Sentori was built specifically for these agentic threat vectors.
 
 ---
 
-## 🔍 20 Security Scanners
+## 🔍 30+ Security Scanners
 
-Sentori v0.8.1 ships with **20 scanners** across 5 categories:
+Sentori ships with **30+ scanners** across 7 categories:
 
 ### 🔗 Supply Chain & Code Integrity
 
@@ -62,6 +62,8 @@ Sentori v0.8.1 ships with **20 scanners** across 5 categories:
 | **Postinstall Scanner** | Malicious `postinstall` scripts that execute on package installation |
 | **LangChain Serialization Scanner** | Unsafe pickle/deserialization in LangChain and agent pipelines |
 | **Convention Squatting Scanner** | Typosquatting, prefix hijacking, namespace confusion on skill and MCP server names |
+| **Package Gate Scanner** | Dependency lockfile analysis, unauthorized package detection, supply chain gate enforcement |
+| **IDE Rule Injection Scanner** | Malicious `.cursorrules`, `.windsurfrules`, `.github/copilot-instructions.md` that inject prompts into developer IDEs |
 
 ### 💉 Prompt Injection & Adversarial
 
@@ -99,13 +101,24 @@ Sentori v0.8.1 ships with **20 scanners** across 5 categories:
 | **Channel Surface Auditor** | Multi-channel attack surfaces, unprotected input channels |
 | **Defense Analyzer** | Missing defense layers, gaps in security architecture |
 
-### 🔮 Coming Soon — MCP Specialist Suite
+### 🔮 MCP Specialist Suite
 
-The next release targets MCP-specific attack surfaces not covered by any existing tool:
+| Scanner | What it catches |
+|---------|----------------|
+| **MCP Tool Shadowing Detector** | Tool names that mimic legitimate MCP server tools to intercept calls — lookalike names (Levenshtein distance), separator swaps (`read-file` vs `read_file`), and case differences (`Bash` vs `bash`) |
+| **MCP Git CVE Scanner** | Checks MCP server dependencies against known CVE databases |
+| **MCP Tool Manifest Scanner** | Validates MCP tool manifests for schema issues, missing fields, and unsafe defaults |
+| **MCP Tool Result Injection Scanner** | Detects injection vectors in MCP tool result handling — malicious payloads returned from tools to the LLM |
 
-- **MCP Tool Shadowing Detector** — detects tools that mimic legitimate MCP server names to intercept calls
-- **Cross-Agent Trust Boundary Scanner** — flags unsafe agent-to-agent communication patterns
-- **MCP Schema Injection Scanner** — finds injection vectors in MCP tool schema definitions
+### 🤖 Agent Framework Security
+
+| Scanner | What it catches |
+|---------|----------------|
+| **Agentic Framework Scanner** | Security issues across multi-agent frameworks — unsafe delegation, missing guardrails, unvalidated tool outputs |
+| **A2A Security Scanner** | Google A2A (Agent-to-Agent) protocol vulnerabilities — unauthenticated endpoints, missing capability restrictions, insecure task delegation |
+
+### Coming Soon
+
 - **Agentic Loop Detector** — identifies infinite loop / resource exhaustion risks in multi-step agent plans
 
 ---
@@ -133,23 +146,29 @@ Sentori outputs a **Security Grade** (A+ to F) based on weighted findings across
 
 ---
 
-## 🆚 Sentori vs MEDUSA (and others)
+## 🆚 Sentori vs Others
 
-| Capability | Sentori | MEDUSA | Generic SAST |
-|------------|---------|--------|-------------|
-| MCP config auditing | ✅ Deep | ❌ | ❌ |
-| DXT (Claude Desktop) scanning | ✅ | ❌ | ❌ |
-| Visual prompt injection (OCR) | ✅ | ❌ | ❌ |
-| Convention squatting detection | ✅ | ❌ | ❌ |
-| DNS/ICMP exfil channels | ✅ | ✅ | ❌ |
-| RAG poisoning | ✅ | ❌ | ❌ |
-| Red team simulation | ✅ | ✅ | ❌ |
-| Supply chain (npm scripts) | ✅ | ✅ | Partial |
-| Secret detection | ✅ | Partial | ✅ |
-| Zero config, npx-ready | ✅ | ❌ | Varies |
-| CI/CD GitHub Action | ✅ | ❌ | Varies |
+| Capability | Sentori | mcp-scan (Snyk) | MEDUSA | Generic SAST |
+|------------|---------|-----------------|--------|-------------|
+| MCP config auditing | ✅ Deep | ✅ Basic | ❌ | ❌ |
+| DXT (Claude Desktop) scanning | ✅ | ❌ | ❌ | ❌ |
+| Visual prompt injection (OCR) | ✅ | ❌ | ❌ | ❌ |
+| IDE rule injection (.cursorrules) | ✅ | ❌ | ❌ | ❌ |
+| Convention squatting detection | ✅ | ❌ | ❌ | ❌ |
+| MCP tool result injection | ✅ | ❌ | ❌ | ❌ |
+| A2A protocol security | ✅ | ❌ | ❌ | ❌ |
+| DNS/ICMP exfil channels | ✅ | ❌ | ✅ | ❌ |
+| RAG poisoning | ✅ | ❌ | ❌ | ❌ |
+| Red team simulation | ✅ | ❌ | ✅ | ❌ |
+| Supply chain (npm scripts) | ✅ | ❌ | ✅ | Partial |
+| Secret detection | ✅ | ❌ | Partial | ✅ |
+| Zero config, npx-ready | ✅ | ✅ | ❌ | Varies |
+| CI/CD GitHub Action + SARIF | ✅ | ❌ | ❌ | Varies |
+| Security grade scoring | ✅ | ❌ | ❌ | Varies |
 
-**MEDUSA** is a framework-level red-teaming tool for testing live agent endpoints. **Sentori** is a static/source-level scanner for agent codebases and MCP servers before deployment. They're complementary, not competing.
+- **mcp-scan** (acquired by Snyk) — lightweight MCP server scanner, now integrated into Snyk platform
+- **MEDUSA** — framework-level red-teaming for live agent endpoints (runtime, not source)
+- **Sentori** — shift-left static scanner for agent codebases before deployment (complementary to runtime tools)
 
 ---
 
@@ -157,7 +176,7 @@ Sentori outputs a **Security Grade** (A+ to F) based on weighted findings across
 
 | Plan | Price | Features |
 |------|-------|---------|
-| **Free** | $0 | All 20 scanners, CLI + npx, JSON output, GitHub Action, unlimited local scans |
+| **Free** | $0 | All 30+ scanners, CLI + npx, JSON/SARIF output, GitHub Action, unlimited local scans |
 | **Pro Cloud** | $29/mo | Everything in Free + cloud scan dashboard, team reports, Slack/GitHub notifications, scan history, priority support |
 | **Enterprise** | Custom | Everything in Pro + custom scanner rules, SSO/SAML, air-gapped deployment, SLA, dedicated security review |
 

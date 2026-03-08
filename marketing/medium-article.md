@@ -91,16 +91,17 @@ This is why we built **Sentori** — a free, open-source security scanner specif
 
 ### What It Does
 
-Sentori runs **13 specialized scanners** that analyze your project for AI-agent-specific security risks:
+Sentori runs **30+ specialized scanners** across 7 categories that analyze your project for AI-agent-specific security risks:
 
-| Scanner | What It Checks |
-|---------|---------------|
-| Supply Chain Scanner | Vulnerable, malicious, or typosquatted dependencies |
-| Deployment Hygiene Auditor | Leaked secrets, misconfigs, overly permissive settings |
-| Convention File Squatting Detector | Malicious files masquerading as AI config files |
-| MCP Config Risk Analyzer | Dangerous MCP server configurations and permission combos |
-| Prompt Injection Surface Scanner | Entry points where external data could influence LLM behavior |
-| ...and 8 more | Covering agent-specific attack vectors |
+| Category | Scanners | What They Catch |
+|----------|----------|----------------|
+| Supply Chain & Code Integrity | 6 scanners | Malicious postinstall scripts, convention squatting, LangChain deserialization, dependency gate, IDE rule injection |
+| Prompt Injection & Adversarial | 4 scanners | Static injection detection, visual prompt injection (OCR), RAG poisoning, red team simulation |
+| Secrets & Data Protection | 3 scanners | API keys/tokens, clipboard exfiltration, DNS/ICMP covert channels |
+| Configuration & Permissions | 6 scanners | DXT security, MCP config auditing, agent config, hygiene, permissions, environment isolation |
+| Architecture & Defense | 3 scanners | Skill auditing, channel surface analysis, defense gap analysis |
+| MCP Specialist Suite | 4 scanners | Tool shadowing, git CVE checking, manifest validation, tool result injection |
+| Agent Framework Security | 2 scanners | Multi-agent framework issues, A2A protocol vulnerabilities |
 
 Each scanner produces actionable findings with severity levels and remediation guidance. It's not a theoretical risk assessment — it's concrete issues in your actual codebase.
 
@@ -109,53 +110,54 @@ Each scanner produces actionable findings with severity levels and remediation g
 **Option 1: CLI (local scan)**
 
 ```bash
-npx @nexylore/sentori /path/to/project
+npx @nexylore/sentori scan /path/to/project
 ```
 
 That's it. No installation, no configuration, no API keys. npx downloads and runs it. You get results in your terminal.
-
-**Option 2: Web scanner**
-
-Go to [sentori-web.vercel.app](https://sentori-web.vercel.app), paste a GitHub repository URL, and hit scan. No signup required. No cost. Results in seconds.
 
 ### What a Scan Looks Like
 
 When you run Sentori against a typical AI agent project, you might see output like:
 
 ```
-🛡️ Sentori Security Scan Results
-=====================================
+╔══════════════════════════════════════════╗
+║         Sentori Security Report          ║
+╠══════════════════════════════════════════╣
+║  Security Grade:  B+    (78/100)         ║
+║  Findings:  2 high · 5 medium · 3 low   ║
+║  Scanners:  30/30 active                 ║
+╚══════════════════════════════════════════╝
+
+[CRITICAL] DXT Security: Unsandboxed extension with code execution
+  → Extension 'calendar-helper' can chain to shell executor
+  → Recommendation: Add sandbox constraints in manifest
 
 [HIGH] Supply Chain: 3 dependencies with known CVEs
   → lodash@4.17.20 (CVE-2021-23337) - Prototype pollution
-  → ...
 
-[CRITICAL] Convention File Squatting: Suspicious .cursorrules detected
+[HIGH] MCP Tool Shadowing: Lookalike tool name detected
+  → 'read-file' shadows built-in 'read_file' (separator swap)
+  → Recommendation: Rename to avoid shadowing
+
+[MEDIUM] Convention Squatting: Suspicious .cursorrules detected
   → File contains encoded payload in rule definition
-  → Recommendation: Review file contents manually
-
-[MEDIUM] Deployment Hygiene: API key found in mcp-config.json
-  → Line 14: OPENAI_API_KEY=sk-...
-  → Recommendation: Move to environment variables
 
 [LOW] MCP Config: Server 'filesystem' has unrestricted path access
   → Recommendation: Scope to specific directories
-
-13 scanners completed | 4 critical | 7 high | 12 medium | 3 low
 ```
 
 Each finding is something you can act on immediately.
 
-### Coming Soon: DXT Scanner
+### DXT Scanner — Now Live
 
-Directly inspired by the LayerX disclosure, we're building a dedicated **DXT Scanner** that will:
+Directly inspired by the LayerX disclosure, Sentori ships with a dedicated **DXT Security Scanner** that:
 
-- Detect unsandboxed extensions and flag the risk
-- Identify dangerous permission combinations (e.g., calendar reader + code executor on the same instance)
-- Analyze MCP tool chaining paths for trust boundary violations
-- Provide specific hardening recommendations
+- Detects unsandboxed extensions and flags the risk
+- Identifies dangerous permission combinations (e.g., calendar reader + code executor on the same instance)
+- Analyzes MCP tool chaining paths for trust boundary violations
+- Provides specific hardening recommendations
 
-This is in active development. If you want to contribute, the repo is open.
+This is the scanner that catches the CVSS 10/10 zero-click RCE attack class. No other open-source tool covers this.
 
 ---
 
@@ -188,10 +190,10 @@ Scan your projects. Fix what you find. And if you build something to make AI age
 ---
 
 **🛡️ Sentori**
-- Web: [sentori-web.vercel.app](https://sentori-web.vercel.app)
-- CLI: `npx @nexylore/sentori /path/to/project`
+- CLI: `npx @nexylore/sentori scan /path/to/project`
 - GitHub: [github.com/TakumaLee/Sentori](https://github.com/TakumaLee/Sentori)
 - npm: [@nexylore/sentori](https://www.npmjs.com/package/@nexylore/sentori)
+- CI/CD: Ships as a GitHub Action with SARIF upload
 
 ---
 

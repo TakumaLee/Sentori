@@ -1,29 +1,42 @@
 # Hacker News Post
 
-**Title:** Show HN: Sentori – Open-source security scanner for AI Agent projects (13 scanners, CLI + web)
+**Title:** Show HN: Sentori – 31 security scanners for AI agents and MCP servers (free, open-source)
 
 ---
 
-Sentori is a free, open-source tool that scans AI Agent projects for security vulnerabilities. It runs 13 specialized scanners:
+Sentori is an open-source security scanner built specifically for the AI agent era — MCP servers, Claude Desktop Extensions, agent frameworks, and LLM toolchains.
 
-- Supply Chain Scanner (vulnerable/malicious deps)
-- Deployment Hygiene Auditor (leaked secrets, misconfigs)
-- Convention File Squatting Detector (malicious AGENTS.md, .cursorrules, etc.)
-- MCP configuration risk analysis
-- Prompt injection surface detection
-- ...and 8 more
+One command, 31 scanners:
 
-**CLI:**
 ```
-npx @nexylore/sentori /path/to/project
+npx @nexylore/sentori scan ./your-agent-project
 ```
 
-**Web:** Paste a GitHub URL at https://sentori-web.vercel.app — no signup.
+What it catches that generic SAST tools miss:
 
-**GitHub:** https://github.com/TakumaLee/Sentori
+- **MCP attack surface**: config misconfigs, tool shadowing (lookalike names that intercept calls), git CVE checking, tool result injection, manifest validation
+- **Prompt injection**: static detection in prompts/tool descriptions, visual prompt injection via OCR on images, RAG poisoning via repetition attacks
+- **Supply chain**: malicious postinstall scripts, convention file squatting (AGENTS.md, .cursorrules registered as domains), LangChain deserialization exploits
+- **DXT (Claude Desktop Extensions)**: unsandboxed execution, dangerous permission combos — detects the CVSS 10/10 zero-click RCE attack vector (LayerX disclosure, Feb 2026)
+- **Covert channels**: DNS/ICMP data exfiltration patterns, clipboard theft
+- **Agent architecture**: permission analyzer, environment isolation audit, defense gap analysis, IDE rule injection
 
-Timely context: LayerX just disclosed a CVSS 10/10 zero-click RCE in Anthropic's DXT (Claude Desktop Extensions) — unsandboxed MCP servers + autonomous tool chaining = a calendar event can execute arbitrary code. Anthropic declined to fix. We're adding a DXT-specific scanner to detect unsandboxed extensions and dangerous permission combos.
+Outputs a security grade (A+ to F) with weighted scoring across code safety, config, defense, and environment dimensions.
 
-The broader problem: AI agent frameworks are shipping with full system access and no privilege separation. Sentori tries to give developers visibility into these risks before deployment.
+**CI/CD**: Ships as a GitHub Action with SARIF upload to Code Scanning.
 
-Built with TypeScript. PRs welcome.
+```yaml
+- uses: TakumaLee/Sentori@main
+  with:
+    scan-path: '.'
+    fail-on-critical: 'true'
+```
+
+**Why now**: Snyk just acquired Invariant Labs, SentinelOne bought Prompt Security, Runlayer raised $11M for MCP gateway security. The market is forming fast, but most tools focus on runtime protection. Sentori is shift-left — scan before deploy, not react after breach.
+
+**Compared to MEDUSA** (76 analyzers, general AI/ML security): Sentori is narrower but deeper on MCP/agent-specific attack vectors. MEDUSA tests live endpoints; Sentori scans source code. Complementary, not competing.
+
+Free and MIT licensed. Built with TypeScript.
+
+GitHub: https://github.com/TakumaLee/Sentori
+npm: https://www.npmjs.com/package/@nexylore/sentori
