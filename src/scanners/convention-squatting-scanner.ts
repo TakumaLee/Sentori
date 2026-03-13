@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as dns from 'dns';
-import { Scanner, ScanResult, Finding, Severity } from '../types';
+import { Scanner, ScanResult, Finding, Severity, ScannerOptions } from '../types';
 import { walkFiles, FileEntry } from '../utils/file-walker';
 
 // --- Types ---

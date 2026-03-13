@@ -1,4 +1,4 @@
-import { Scanner, ScanReport, ScanResult } from './types';
+import { Scanner, ScannerOptions, ScanReport, ScanResult } from './types';
 import { calculateSummary } from './utils/scorer';
 
 export class ScannerRegistry {
@@ -16,7 +16,7 @@ export class ScannerRegistry {
     this.scanners = [...scanners];
   }
 
-  async runAll(targetDir: string, onProgress?: (step: number, total: number, scannerName: string, result?: ScanResult) => void): Promise<ScanReport> {
+  async runAll(targetDir: string, onProgress?: (step: number, total: number, scannerName: string, result?: ScanResult) => void, options?: ScannerOptions): Promise<ScanReport> {
     const timestamp = new Date().toISOString();
     const results: ScanResult[] = [];
     const total = this.scanners.length;
@@ -24,7 +24,10 @@ export class ScannerRegistry {
     for (let i = 0; i < total; i++) {
       const scanner = this.scanners[i];
       onProgress?.(i + 1, total, scanner.name);
-      const result = await scanner.scan(targetDir);
+      // Module-based scanners (ScannerModule) accept an optional second options
+      // argument. Class-based legacy scanners ignore extra arguments in JS, so
+      // it is safe to always pass options — they will silently be discarded.
+      const result = await (scanner.scan as (dir: string, opts?: ScannerOptions) => Promise<ScanResult>).call(scanner, targetDir, options);
       results.push(result);
       onProgress?.(i + 1, total, scanner.name, result);
     }

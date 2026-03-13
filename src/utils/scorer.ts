@@ -99,6 +99,15 @@ function calculateScoreFromFindings(findings: Finding[]): number {
 }
 
 export function calculateSummary(results: ScanResult[]): ReportSummary {
+  // Validate DIMENSION_MAP coverage for all scanners in this run
+  const unknownScanners = [...new Set(results.map(r => r.scanner))].filter(name => !DIMENSION_MAP[name]);
+  for (const name of unknownScanners) {
+    console.warn(
+      `[Sentori] DIMENSION_MAP missing entry for scanner "${name}" — falling back to 'codeSafety'. ` +
+      `Add it to DIMENSION_MAP in src/utils/scorer.ts.`
+    );
+  }
+
   let critical = 0;
   let high = 0;
   let medium = 0;

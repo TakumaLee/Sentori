@@ -1,4 +1,4 @@
-import { Scanner, ScanResult, Finding, Severity } from '../types';
+import { Scanner, ScanResult, Finding, Severity, ScannerOptions } from '../types';
 import { walkFiles, FileEntry } from '../utils/file-walker';
 import { INJECTION_PATTERNS } from '../patterns/injection-patterns';
 import * as fs from 'fs';

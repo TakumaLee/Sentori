@@ -162,6 +162,8 @@ async function main(): Promise<void> {
     process.env.SENTORI_DEEP_SCAN = '1';
   }
 
+  const includeVendored = args.includes('--include-vendored');
+
   let outputPath: string | undefined;
   const outputIdx = args.findIndex((a) => a === '--output' || a === '-o');
   if (outputIdx !== -1 && args[outputIdx + 1]) {
@@ -253,6 +255,8 @@ async function main(): Promise<void> {
     registry.register(customRulesScanner(sentoriConfig.rules) as unknown as import('./types').Scanner);
   }
 
+  const scanOptions = { includeVendored };
+
   let report = await registry.runAll(targetDir, (step, total, name, result) => {
     if (jsonMode || sarifMode) return;
     const pct = Math.round((step / total) * 100);
@@ -268,7 +272,7 @@ async function main(): Promise<void> {
       const findingsColor = result.findings.length > 0 ? chalk.yellow(String(result.findings.length)) : chalk.green('0');
       process.stdout.write(`\r  ${bar} ${pct}% · ${name} ${chalk.gray('→')} ${findingsColor} findings ${chalk.gray(`(${result.duration}ms)`)}   \n`);
     }
-  });
+  }, scanOptions);
 
   // Apply .sentori.yml ignore filters and severity overrides
   if (sentoriConfig && (sentoriConfig.ignore.length > 0 || sentoriConfig.overrides.length > 0)) {

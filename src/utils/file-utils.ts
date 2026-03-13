@@ -113,7 +113,6 @@ export function buildIgnoreList(userExcludes?: string[], includeVendored?: boole
 const CACHE_DATA_PATTERNS = [
   /[/\\]cache[/\\]/i,
   /[/\\]caches[/\\]/i,
-  /[/\\]data[/\\]/i,
   /[/\\]knowledge[/\\]/i,
   /[/\\]logs?[/\\]/i,
   /[/\\]outputs?[/\\]/i,   // covers both output/ and outputs/
@@ -129,8 +128,21 @@ const CACHE_DATA_PATTERNS = [
   /[/\\]history[/\\]/i,    // history files
 ];
 
+// Source-code directory names — /data/ nested under these is NOT cache/data
+const SOURCE_CODE_DIRS = /[/\\](?:src|app|lib|pages|components|features|core|modules|services|api)[/\\]/i;
+
 export function isCacheOrDataFile(filePath: string): boolean {
-  return CACHE_DATA_PATTERNS.some(p => p.test(filePath));
+  if (CACHE_DATA_PATTERNS.some(p => p.test(filePath))) {
+    // Do not downgrade files under src/ — source code, not cache/data
+    if (/[/\\]src[/\\]/i.test(filePath)) return false;
+    return true;
+  }
+  // /data/ is only treated as cache when not nested under known source directories
+  if (/[/\\]data[/\\]/i.test(filePath)) {
+    if (SOURCE_CODE_DIRS.test(filePath)) return false;
+    return true;
+  }
+  return false;
 }
 
 // Files that are likely test/doc context — findings here get severity downgraded
@@ -184,9 +196,11 @@ export function isSentoriSourceFile(filePath: string): boolean {
     if (/^[/\\][A-Z]+\.md$/i.test(relative)) return true;
   }
 
-  // Fallback: also match when running from source (not compiled)
-  return /sentori[/\\]src[/\\]/i.test(filePath) &&
-         filePath.includes('sentori');
+  // Fallback: match when running from source (not compiled), but only for the
+  // canonical Sentori package path to avoid misclassifying user projects that
+  // happen to have "sentori" somewhere in their path.
+  return /[/\\]@nexylore[/\\]sentori[/\\]src[/\\]/i.test(filePath) ||
+         /[/\\]nexylore[/\\]sentori[/\\]src[/\\]/i.test(filePath);
 }
 
 /**
@@ -207,10 +221,29 @@ export function isSentoriProject(targetPath: string): boolean {
  * Check if a file is a security scanning/detection tool.
  * Files named detector, scanner, auditor, guard etc. that read credential
  * paths are doing so for detection purposes, not for exfiltration.
+ *
+ * Requires BOTH a known tool-directory path AND the keyword in the filename
+ * to avoid false-positives on arbitrary user files that happen to contain
+ * these common words (e.g. user's data-monitor.py, log-checker.ts).
  */
-export function isSecurityToolFile(filePath: string): boolean {
+export function isSecurityToolFile(filePath: string, content?: string): boolean {
   const basename = (filePath.split(/[/\\]/).pop() || '').toLowerCase();
-  return /(?:detector|scanner|auditor|guard|sentinel|monitor|checker|linter|analyzer)/.test(basename);
+  const hasToolKeyword = /(?:detector|scanner|auditor|guard|sentinel|monitor|checker|linter|analyzer)/.test(basename);
+  if (!hasToolKeyword) return false;
+
+  // Content-based heuristic: requires both pattern-matching code and a detection/reporting action,
+  // OR an import of a security-related library.
+  // This prevents malicious files named like security tools from evading detection.
+  if (content) {
+    const hasPatternCheck = /(?:\.test\s*\(|\.match\s*\(|\.includes\s*\(|RegExp\s*\(|indexOf\s*\()/.test(content);
+    const hasReportingAction = /\b(?:report|alert|detect|flag|warn|audit)\s*[\(\{]/.test(content);
+    const importsSecurityLib = /(?:require|import)\s+.*['"].*(?:security|scanner|detector|audit|vault|credential)['"]/.test(content);
+    return (hasPatternCheck && hasReportingAction) || importsSecurityLib;
+  }
+
+  // Without content: fall back to directory-based check
+  const inToolDir = /[/\\](?:scanners?|detectors?|auditors?|guards?|security|analysis|analyzers?)[/\\]/i.test(filePath);
+  return inToolDir;
 }
 
 // Max file size to scan (256KB) — skip binary/large generated files

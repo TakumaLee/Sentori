@@ -404,7 +404,7 @@ export class AgenticFrameworkScanner implements Scanner {
   description =
     'Detects security issues in agentic AI framework configurations (LangChain, AutoGen, CrewAI) — API key leaks, plaintext credentials, and hardcoded secrets';
 
-  async scan(targetDir: string, _options?: ScannerOptions): Promise<ScanResult> {
+  async scan(targetDir: string, options?: ScannerOptions): Promise<ScanResult> {
     const startTime = Date.now();
     const findings: Finding[] = [];
     let scannedFiles = 0;

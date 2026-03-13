@@ -102,6 +102,7 @@ describe('Fix 1: Permission Analyzer — config structure detection', () => {
     expect(isCacheOrDataFile('/project/data/users.json')).toBe(true);
     expect(isCacheOrDataFile('/project/knowledge/faq.json')).toBe(true);
     expect(isCacheOrDataFile('/project/src/config.json')).toBe(false);
+    expect(isCacheOrDataFile('/project/app/data/config.json')).toBe(false);
   });
 
   test('isDefiningToolPermissions detects actual tool permission definitions', () => {

@@ -16,21 +16,36 @@ export interface WalkOptions {
   extensions?: Set<string>;
   /** Maximum file size in bytes. Files larger than this are skipped. Default: 10 MB. */
   maxFileSize?: number;
+  /**
+   * When true, include vendored/third-party directories (third_party, external,
+   * deps, etc.). Default: false (vendored dirs are skipped).
+   */
+  includeVendored?: boolean;
 }
+
+/** Directory names considered vendored/third-party — skipped unless includeVendored is true. */
+const VENDORED_SKIP_DIRS = new Set([
+  'third_party', 'third-party', 'thirdparty',
+  'external', 'deps',
+]);
 
 export function walkFiles(dir: string, extensionsOrOpts?: Set<string> | WalkOptions): FileEntry[] {
   let exts: Set<string>;
   let maxFileSize: number;
+  let includeVendored: boolean;
 
   if (extensionsOrOpts instanceof Set) {
     exts = extensionsOrOpts;
     maxFileSize = DEFAULT_MAX_FILE_SIZE;
+    includeVendored = false;
   } else if (extensionsOrOpts) {
     exts = extensionsOrOpts.extensions ?? SCAN_EXTENSIONS;
     maxFileSize = extensionsOrOpts.maxFileSize ?? DEFAULT_MAX_FILE_SIZE;
+    includeVendored = extensionsOrOpts.includeVendored ?? false;
   } else {
     exts = SCAN_EXTENSIONS;
     maxFileSize = DEFAULT_MAX_FILE_SIZE;
+    includeVendored = false;
   }
 
   const entries: FileEntry[] = [];
@@ -51,6 +66,7 @@ export function walkFiles(dir: string, extensionsOrOpts?: Set<string> | WalkOpti
           'sd-setup',  // Stable Diffusion
         ]);
         if (skipDirs.has(item.name)) continue;
+        if (!includeVendored && VENDORED_SKIP_DIRS.has(item.name)) continue;
         walk(fullPath);
       } else if (item.isFile()) {
         const ext = path.extname(item.name).toLowerCase();

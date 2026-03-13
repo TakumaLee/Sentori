@@ -347,7 +347,7 @@ export const skillAuditor: ScannerModule = {
 
         // Security tools (detector, scanner, auditor, guard) reading credential
         // paths is normal behavior — they need to detect credential leaks
-        if (isSecurityToolFile(file)) {
+        if (isSecurityToolFile(file, content)) {
           for (const f of fileFindings) {
             if (f.id!.startsWith('SA-002-') && f.title === 'Reading sensitive file' && f.severity !== 'info') {
               f.severity = 'info';
