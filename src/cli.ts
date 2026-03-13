@@ -121,6 +121,7 @@ function printHelp(): void {
   console.log(chalk.gray('    --ioc PATH         Path to external IOC blocklist JSON file'));
   console.log(chalk.gray('    --deep-scan        Enable OCR scanning of image files (slow)'));
   console.log(chalk.gray('    --profile PROFILE  Filter scanners by profile: agent (default), general, mobile'));
+  console.log(chalk.gray('    --require-provenance   Exit 1 if any packages lack npm attestation'));
   console.log('');
   console.log(chalk.bold('  Examples:'));
   console.log(chalk.cyan('    npx @nexylore/sentori scan'));
@@ -163,6 +164,7 @@ async function main(): Promise<void> {
   }
 
   const includeVendored = args.includes('--include-vendored');
+  const requireProvenance = args.includes('--require-provenance');
 
   let outputPath: string | undefined;
   const outputIdx = args.findIndex((a) => a === '--output' || a === '-o');
@@ -309,6 +311,14 @@ async function main(): Promise<void> {
 
   // Exit code: 2 = critical, 1 = high, 0 = ok
   const s = report.summary;
+  if (requireProvenance) {
+    const attestationFindings = report.results
+      .find((r) => r.scanner === 'NPM Attestation Scanner')?.findings ?? [];
+    const unattested = attestationFindings.filter((f) => f.rule === 'ATTESTATION-001');
+    if (unattested.length > 0) {
+      process.exit(s.critical > 0 ? 2 : 1);
+    }
+  }
   process.exit(s.critical > 0 ? 2 : s.high > 0 ? 1 : 0);
 }
 

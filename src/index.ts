@@ -27,6 +27,7 @@ export { mcpToolShadowingDetector } from './scanners/mcp-tool-shadowing-detector
 export { mcpToolResultInjectionScanner } from './scanners/mcp-tool-result-injection-scanner';
 export { mcpGitCveScanner } from './scanners/mcp-git-cve-scanner';
 export { a2aSecurityScanner } from './scanners/a2a-security-scanner';
+export { npmAttestationScanner } from './scanners/npm-attestation-scanner';
 export { walkFiles } from './utils/file-walker';
 export * from './types';
 
@@ -62,6 +63,7 @@ import { mcpToolShadowingDetector } from './scanners/mcp-tool-shadowing-detector
 import { mcpToolResultInjectionScanner } from './scanners/mcp-tool-result-injection-scanner';
 import { mcpGitCveScanner } from './scanners/mcp-git-cve-scanner';
 import { a2aSecurityScanner } from './scanners/a2a-security-scanner';
+import { npmAttestationScanner } from './scanners/npm-attestation-scanner';
 
 export function createDefaultRegistry(externalIOCPath?: string): ScannerRegistry {
   const registry = new ScannerRegistry();
@@ -73,6 +75,7 @@ export function createDefaultRegistry(externalIOCPath?: string): ScannerRegistry
   registry.register(new VisualPromptInjectionScanner());
   registry.register(new LangChainSerializationScanner());
   registry.register(new AgenticFrameworkScanner());
+  registry.register(npmAttestationScanner as unknown as Scanner);
   registry.register(new PostinstallScanner());
   registry.register(new ConventionSquattingScanner());
 
