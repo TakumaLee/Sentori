@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { Scanner, ScanResult, Finding, Severity } from '../types';
+import { Scanner, ScannerOptions, ScanResult, Finding, Severity } from '../types';
 
 // --- Types ---
 
@@ -96,7 +96,7 @@ export class DxtSecurityScanner implements Scanner {
    * Scan a target directory for DXT extension configs.
    * Looks for JSON files that contain DXT extension definitions.
    */
-  async scan(targetDir: string): Promise<ScanResult> {
+  async scan(targetDir: string, _options?: ScannerOptions): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
 

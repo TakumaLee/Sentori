@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { Scanner, ScanResult, Finding, Severity } from '../types';
+import { Scanner, ScannerOptions, ScanResult, Finding, Severity } from '../types';
 import { walkFiles } from '../utils/file-walker';
 
 const HYGIENE_SCAN_EXTENSIONS = new Set([
@@ -573,10 +573,10 @@ export class HygieneAuditor implements Scanner {
     checkMonitoringKillSwitch,
   ];
 
-  async scan(targetDir: string): Promise<ScanResult> {
+  async scan(targetDir: string, options?: ScannerOptions): Promise<ScanResult> {
     const start = Date.now();
     const config = loadAgentConfig(targetDir);
-    const files = walkFiles(targetDir, { extensions: HYGIENE_SCAN_EXTENSIONS });
+    const files = walkFiles(targetDir, { extensions: HYGIENE_SCAN_EXTENSIONS, includeVendored: options?.includeVendored });
     const fileContents = [
       ...files.map((f) => ({ relativePath: f.relativePath, content: f.content })),
       ...collectExtraFiles(targetDir),

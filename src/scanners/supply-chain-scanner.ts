@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { Scanner, ScanResult, Finding, Severity } from '../types';
+import { Scanner, ScannerOptions, ScanResult, Finding, Severity } from '../types';
 import { walkFiles, FileEntry } from '../utils/file-walker';
 import defaultIOC from '../data/ioc-blocklist.json';
 
@@ -533,11 +533,11 @@ export class SupplyChainScanner implements Scanner {
     ];
   }
 
-  async scan(targetDir: string): Promise<ScanResult> {
+  async scan(targetDir: string, options?: ScannerOptions): Promise<ScanResult> {
     const start = Date.now();
     const skillsDir = path.join(targetDir, 'skills');
     const scanDir = fs.existsSync(skillsDir) ? skillsDir : targetDir;
-    const files = walkFiles(scanDir);
+    const files = walkFiles(scanDir, { includeVendored: options?.includeVendored });
     const findings: Finding[] = [];
 
     for (const file of files) {
