@@ -125,7 +125,7 @@ Sentori ships with **30+ scanners** across 7 categories:
 
 ## 📊 Security Scoring
 
-Sentori outputs a **Security Grade** (A+ to F) based on weighted findings across 4 dimensions:
+Sentori outputs a **Security Grade** (A+ to F) based on confidence-weighted findings across 4 dimensions:
 
 ```
 ╔══════════════════════════════════════════╗
@@ -133,16 +133,49 @@ Sentori outputs a **Security Grade** (A+ to F) based on weighted findings across
 ╠══════════════════════════════════════════╣
 ║  Security Grade:  B+    (78/100)         ║
 ║  Findings:  2 high · 5 medium · 3 low   ║
-║  Scanners:  20/20 active                 ║
+║  Scanners:  30/30 active                 ║
 ╚══════════════════════════════════════════╝
 ```
 
+### 3-Dimension Scoring
+
 | Dimension | Weight | What it measures |
 |-----------|--------|-----------------|
-| Code Safety | 40% | Supply chain, secrets, injection patterns in code |
-| Config Safety | 30% | MCP configs, DXT manifests, agent YAML |
-| Defense Score | 20% | Presence of guardrails, sandboxing, rate limits |
-| Env Safety | 10% | Isolation, shared environment risks |
+| Code Safety | 35% | Supply chain, secrets, injection patterns in code |
+| Config Safety | 25% | MCP configs, DXT manifests, permissions, channels |
+| Defense Score | 25% | Presence of guardrails, sandboxing, prompt hardening |
+| Env Safety | 15% | Isolation, shared environment risks, container config |
+
+**Floor rule:** If any single dimension scores F (<60), the overall score is capped at that dimension's score + 10. Security is only as strong as the weakest link.
+
+### Confidence Levels
+
+Each finding carries a **confidence** level that affects its weight in the score:
+
+| Confidence | Weight | When assigned |
+|------------|--------|---------------|
+| `definite` | 1.0× | Direct pattern match (e.g., hardcoded API key) |
+| `likely` | 0.8× | Static analysis with low false positive rate |
+| `possible` | 0.6× | Inferential analysis (e.g., missing defense detection) |
+
+Third-party code findings are further weighted at 0.3× (developers can't directly fix vendored code).
+
+### CLI Flags
+
+| Flag | Description |
+|------|-------------|
+| `--include-vendored` | Include third-party/vendored directories in the scan |
+| `--json` | Output results as JSON |
+| `--output <file>` | Save JSON report to file |
+| `--context <app\|framework\|skill>` | Set scan context for severity adjustments |
+
+### JSON Output
+
+When using `--json` or `--output`, the report includes:
+
+- `summary.dimensions` — per-dimension scores (`codeSafety`, `configSafety`, `defenseScore`, `environmentSafety`)
+- `summary.scannerBreakdown` — per-scanner finding counts by severity
+- Each finding includes a `confidence` field (`definite`, `likely`, or `possible`)
 
 ---
 
