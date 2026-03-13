@@ -224,6 +224,21 @@ export function isWorkspaceConfigFile(filePath: string): boolean {
  * Detect if a file is a defense pattern list (blocklist/denylist of attack patterns).
  * These files contain injection patterns for DETECTION, not for attacking.
  */
+/** Count how many distinct injection categories the content matches. */
+function countMatchedCategories(content: string): number {
+  const matched = new Set<string>();
+  const lines = content.split('\n');
+  for (const pattern of INJECTION_PATTERNS) {
+    for (const line of lines) {
+      if (pattern.pattern.test(line)) {
+        matched.add(pattern.category);
+        break;
+      }
+    }
+  }
+  return matched.size;
+}
+
 export function isDefensePatternFile(content: string, filePath?: string): boolean {
   // Signal 1: File path contains defense-related keywords
   const defensePathPatterns = [
@@ -233,8 +248,10 @@ export function isDefensePatternFile(content: string, filePath?: string): boolea
   ];
   const pathIsDefensive = filePath ? defensePathPatterns.some(p => p.test(filePath)) : false;
 
-  // Signal 2: JSON file with blocklist/patterns array structure
-  if (filePath && isJsonFile(filePath)) {
+  // Signal 2: JSON file with blocklist/patterns array structure — path must also be defensive,
+  // AND content must match injection patterns from at least 2 categories.
+  // Without the category check, an attacker can name a key "attack_patterns" and bypass scanning.
+  if (filePath && isJsonFile(filePath) && pathIsDefensive) {
     const parsed = tryParseJson(content);
     if (parsed && typeof parsed === 'object') {
       const obj = parsed as Record<string, unknown>;
@@ -243,56 +260,24 @@ export function isDefensePatternFile(content: string, filePath?: string): boolea
       const hasBlocklistKey = Object.keys(obj).some(k =>
         blocklistKeys.some(bk => k.toLowerCase().includes(bk))
       );
-      if (hasBlocklistKey) return true;
+      if (hasBlocklistKey && countMatchedCategories(content) >= 2) return true;
 
       // Check nested: if any key contains an array with many string entries that look like patterns
       const arrays = Object.values(obj).filter(v => Array.isArray(v)) as unknown[][];
       for (const arr of arrays) {
         if (arr.length > 10 && arr.every(item => typeof item === 'string')) {
-          // Many string items in an array — likely a pattern list
-          return true;
+          // Many string items AND multiple injection categories = likely a comprehensive defense list
+          if (countMatchedCategories(content) >= 2) return true;
         }
       }
     }
   }
 
-  // Signal 3: File with many different injection pattern matches (>10 unique categories)
-  // This is a strong heuristic — real attack content usually focuses on 1-2 categories
-  if (!filePath || !isJsonFile(filePath)) {
-    const matchedCategories = new Set<string>();
-    const lines = content.split('\n');
-    for (const pattern of INJECTION_PATTERNS) {
-      for (const line of lines) {
-        if (pattern.pattern.test(line)) {
-          matchedCategories.add(pattern.category);
-          break;
-        }
-      }
-    }
-    if (matchedCategories.size > 5) return true;
+  // Signal 3: File matching many injection categories AND path is defensive.
+  // Requiring both prevents comprehensive attack files from self-classifying as defense.
+  if (pathIsDefensive && (!filePath || !isJsonFile(filePath))) {
+    if (countMatchedCategories(content) > 5) return true;
   }
-
-  // Signal 4: Path alone is not enough — require at least 2 signals
-  // (pathIsDefensive counts as 1; combine with content-based signals)
-  let signals = 0;
-  if (pathIsDefensive) signals++;
-
-  // Content signal: file has injection matches across multiple categories (>= 3)
-  if (!filePath || !isJsonFile(filePath)) {
-    const cats = new Set<string>();
-    const lines = content.split('\n');
-    for (const pattern of INJECTION_PATTERNS) {
-      for (const line of lines) {
-        if (pattern.pattern.test(line)) {
-          cats.add(pattern.category);
-          break;
-        }
-      }
-    }
-    if (cats.size >= 3) signals++;
-  }
-
-  if (signals >= 2) return true;
 
   return false;
 }
