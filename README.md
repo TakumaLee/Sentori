@@ -5,7 +5,7 @@
 > **AI Agent Security Scanner — 守るべきものを、守る。**
 
 [![npm version](https://img.shields.io/npm/v/@nexylore/sentori.svg)](https://www.npmjs.com/package/@nexylore/sentori)
-[![license](https://img.shields.io/npm/l/@nexylore/sentori.svg)](./LICENSE)
+[![license](https://img.shields.io/badge/license-BSL--1.1-blue.svg)](./LICENSE)
 [![tests](https://img.shields.io/github/actions/workflow/status/TakumaLee/Sentori/ci.yml?label=tests)](https://github.com/TakumaLee/Sentori/actions)
 
 **Sentori** is a security scanner purpose-built for the MCP (Model Context Protocol) ecosystem and AI agent toolchains. Where broad surface-area tools scan everything loosely, Sentori goes deep — covering prompt injection, supply chain poisoning, MCP misconfigs, secret leaks, and agentic attack vectors that generic scanners miss entirely.
@@ -50,9 +50,9 @@ Sentori was built specifically for these agentic threat vectors.
 
 ---
 
-## 🔍 30+ Security Scanners
+## 🔍 29 Security Scanners
 
-Sentori ships with **30+ scanners** across 7 categories:
+Sentori ships with **29 scanners** across 7 categories:
 
 ### 🔗 Supply Chain & Code Integrity
 
@@ -62,7 +62,7 @@ Sentori ships with **30+ scanners** across 7 categories:
 | **Postinstall Scanner** | Malicious `postinstall` scripts that execute on package installation |
 | **LangChain Serialization Scanner** | Unsafe pickle/deserialization in LangChain and agent pipelines |
 | **Convention Squatting Scanner** | Typosquatting, prefix hijacking, namespace confusion on skill and MCP server names |
-| **Package Gate Scanner** | Dependency lockfile analysis, unauthorized package detection, supply chain gate enforcement |
+| **NPM Attestation Scanner** | Verifies npm package attestations and OIDC provenance signatures for supply chain integrity |
 | **IDE Rule Injection Scanner** | Malicious `.cursorrules`, `.windsurfrules`, `.github/copilot-instructions.md` that inject prompts into developer IDEs |
 
 ### 💉 Prompt Injection & Adversarial
@@ -92,6 +92,7 @@ Sentori ships with **30+ scanners** across 7 categories:
 | **Hygiene Auditor** | Overly broad permissions, missing access controls, risky defaults |
 | **Permission Analyzer** | Excessive permission grants, missing least-privilege enforcement |
 | **Environment Isolation Auditor** | Missing sandboxing, shared environments, container escape risks |
+| **Tetora Config Auditor** | Tetora agent configuration security — unsafe dispatch settings, missing guardrails, overprivileged roles |
 
 ### 🧪 Architecture & Defense
 
@@ -133,7 +134,7 @@ Sentori outputs a **Security Grade** (A+ to F) based on confidence-weighted find
 ╠══════════════════════════════════════════╣
 ║  Security Grade:  B+    (78/100)         ║
 ║  Findings:  2 high · 5 medium · 3 low   ║
-║  Scanners:  30/30 active                 ║
+║  Scanners:  29/29 active                 ║
 ╚══════════════════════════════════════════╝
 ```
 
@@ -209,7 +210,7 @@ When using `--json` or `--output`, the report includes:
 
 | Plan | Price | Features |
 |------|-------|---------|
-| **Free** | $0 | All 30+ scanners, CLI + npx, JSON/SARIF output, GitHub Action, unlimited local scans |
+| **Free** | $0 | All 29 scanners, CLI + npx, JSON/SARIF output, GitHub Action, unlimited local scans |
 | **Pro Cloud** | $29/mo | Everything in Free + cloud scan dashboard, team reports, Slack/GitHub notifications, scan history, priority support |
 | **Enterprise** | Custom | Everything in Pro + custom scanner rules, SSO/SAML, air-gapped deployment, SLA, dedicated security review |
 
@@ -340,4 +341,8 @@ npm test
 
 ## License
 
-MIT © Nexylore
+[BSL 1.1](./LICENSE) © Nexylore
+
+**Free to use** for scanning your own projects, internal CI/CD, education, and research.
+**Commercial restriction** applies only to building competing security scanning services.
+Converts to **Apache 2.0** on 2030-03-16.
