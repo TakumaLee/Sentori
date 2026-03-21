@@ -311,6 +311,31 @@ docs/
 examples/
 ```
 
+### Custom Rules (`.sentori.yml`)
+
+Place a `.sentori.yml` in the root of your target directory to define project-specific rules, suppress findings, or override severity levels:
+
+```yaml
+version: 1
+
+rules:
+  - id: no-hardcoded-aws-key
+    pattern: "AKIA[0-9A-Z]{16}"
+    severity: critical
+    message: "Hardcoded AWS access key ID"
+    files: "**/*.{ts,js,py}"  # optional glob — defaults to all files
+
+ignore:
+  - scanner: "Secret Leak Scanner"
+    file: "tests/**"
+
+overrides:
+  - scanner: "Supply Chain Scanner"
+    severity: high
+```
+
+See [`docs/sentori-yml.md`](docs/sentori-yml.md) for the full schema reference.
+
 ### IOC Blocklist
 
 The built-in IOC blocklist is at `src/data/ioc-blocklist.json`. Provide an external JSON file to extend it:

@@ -245,6 +245,12 @@ async function main(): Promise<void> {
         console.log(chalk.gray(`  Config: ${ruleCount} rules, ${ignoreCount} ignores, ${overrideCount} overrides`));
         console.log('');
       }
+      if (sentoriConfig.warnings.length > 0) {
+        for (const w of sentoriConfig.warnings) {
+          console.warn(chalk.yellow(`  ⚠ ${w}`));
+        }
+        console.log('');
+      }
     }
   } catch (err) {
     if (!jsonMode && !sarifMode) {

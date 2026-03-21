@@ -40,7 +40,7 @@ AI Agent / MCP Server 安全掃描 CLI 工具——20 個 Scanner 偵測 prompt 
 - [ ] Web Dashboard — 掃描結果視覺化（sentori-web 負責）
 - [ ] SARIF 輸出 — 標準安全報告格式（GitHub Code Scanning 整合）
 - [ ] VS Code Extension — 編輯器內即時掃描
-- [ ] 自訂規則 — YAML 定義自訂 Scanner 規則
+- [x] 自訂規則 — YAML 定義自訂 Scanner 規則 ✅
 - [ ] API 模式 — REST API 供 sentori-web 呼叫
 
 ## 技術架構
