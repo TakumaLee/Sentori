@@ -18,19 +18,31 @@ export class ScannerRegistry {
 
   async runAll(targetDir: string, onProgress?: (step: number, total: number, scannerName: string, result?: ScanResult) => void, options?: ScannerOptions): Promise<ScanReport> {
     const timestamp = new Date().toISOString();
-    const results: ScanResult[] = [];
     const total = this.scanners.length;
+    const results: ScanResult[] = new Array(total);
 
-    for (let i = 0; i < total; i++) {
-      const scanner = this.scanners[i];
-      onProgress?.(i + 1, total, scanner.name);
-      // Module-based scanners (ScannerModule) accept an optional second options
-      // argument. Class-based legacy scanners ignore extra arguments in JS, so
-      // it is safe to always pass options — they will silently be discarded.
-      const result = await (scanner.scan as (dir: string, opts?: ScannerOptions) => Promise<ScanResult>).call(scanner, targetDir, options);
-      results.push(result);
-      onProgress?.(i + 1, total, scanner.name, result);
-    }
+    // Run scanners in parallel with concurrency limit of 5
+    const CONCURRENCY = 5;
+    let nextIndex = 0;
+    let completedCount = 0;
+
+    const runNext = async (): Promise<void> => {
+      while (nextIndex < total) {
+        const i = nextIndex++;
+        const scanner = this.scanners[i];
+        onProgress?.(completedCount + 1, total, scanner.name);
+        // Module-based scanners (ScannerModule) accept an optional second options
+        // argument. Class-based legacy scanners ignore extra arguments in JS, so
+        // it is safe to always pass options — they will silently be discarded.
+        const result = await (scanner.scan as (dir: string, opts?: ScannerOptions) => Promise<ScanResult>).call(scanner, targetDir, options);
+        results[i] = result;
+        completedCount++;
+        onProgress?.(completedCount, total, scanner.name, result);
+      }
+    };
+
+    const workers = Array.from({ length: Math.min(CONCURRENCY, total) }, () => runNext());
+    await Promise.all(workers);
 
     const summary = calculateSummary(results);
 
