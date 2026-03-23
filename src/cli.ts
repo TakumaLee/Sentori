@@ -3,59 +3,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import chalk from 'chalk';
-import { minimatch } from 'minimatch';
 import { createDefaultRegistry } from './index';
 import { printReport, writeJsonReport, buildSarifReport, writeSarifReport } from './utils/reporter';
 import { calculateSummary } from './utils/scorer';
-import { ScannerModule, ScanReport } from './types';
+import { ScannerModule } from './types';
 import { loadSentoriConfig, SentoriConfig } from './config/sentori-config';
 import { customRulesScanner } from './scanners/custom-rules-scanner';
-
-// ─── .sentori.yml config application ─────────────────────────────────────────
-
-/**
- * Apply ignore entries and severity overrides from .sentori.yml to a completed
- * scan report. Does not mutate the input; returns a new report object.
- */
-function applyConfig(report: ScanReport, config: SentoriConfig): ScanReport {
-  const { ignore, overrides } = config;
-
-  const results = report.results.map((result) => {
-    let findings = result.findings;
-
-    // 1. Severity overrides — must run before ignore so overrides apply to kept findings
-    if (overrides.length > 0) {
-      findings = findings.map((f) => {
-        for (const ov of overrides) {
-          if (ov.scanner !== result.scanner) continue;
-          if (ov.rule !== undefined && ov.rule !== f.rule) continue;
-          return { ...f, severity: ov.severity };
-        }
-        return f;
-      });
-    }
-
-    // 2. Ignore filters — suppress findings where ALL specified fields match
-    if (ignore.length > 0) {
-      findings = findings.filter((f) => {
-        for (const ig of ignore) {
-          const scannerMatch = ig.scanner === undefined || ig.scanner === result.scanner;
-          const ruleMatch = ig.rule === undefined || ig.rule === f.rule;
-          const fileMatch =
-            ig.file === undefined ||
-            (f.file !== undefined && minimatch(f.file, ig.file, { matchBase: false }));
-
-          if (scannerMatch && ruleMatch && fileMatch) return false; // suppress
-        }
-        return true; // keep
-      });
-    }
-
-    return { ...result, findings };
-  });
-
-  return { ...report, results };
-}
+import { applyConfig } from './utils/apply-config';
+import { printConfigWarnings } from './utils/print-warnings';
 
 // ─── Profile filtering ──────────────────────────────────────────────────────
 
@@ -122,6 +77,7 @@ function printHelp(): void {
   console.log(chalk.gray('    --deep-scan        Enable OCR scanning of image files (slow)'));
   console.log(chalk.gray('    --profile PROFILE  Filter scanners by profile: agent (default), general, mobile'));
   console.log(chalk.gray('    --require-provenance   Exit 1 if any packages lack npm attestation'));
+  console.log(chalk.gray('    --include-vendored   Include vendored/third-party code in scan'));
   console.log('');
   console.log(chalk.bold('  Examples:'));
   console.log(chalk.cyan('    npx @nexylore/sentori scan'));
@@ -246,10 +202,7 @@ async function main(): Promise<void> {
         console.log('');
       }
       if (sentoriConfig.warnings.length > 0) {
-        for (const w of sentoriConfig.warnings) {
-          console.warn(chalk.yellow(`  ⚠ ${w}`));
-        }
-        console.log('');
+        printConfigWarnings(sentoriConfig.warnings);
       }
     }
   } catch (err) {
@@ -294,7 +247,6 @@ async function main(): Promise<void> {
 
   if (sarifMode && outputPath) {
     // --format sarif --output file.sarif
-    printReport(report);
     writeSarifReport(report, outputPath);
   } else if (sarifMode) {
     // --format sarif → stdout
