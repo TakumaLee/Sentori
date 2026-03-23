@@ -28,6 +28,7 @@ export { mcpToolResultInjectionScanner } from './scanners/mcp-tool-result-inject
 export { mcpGitCveScanner } from './scanners/mcp-git-cve-scanner';
 export { a2aSecurityScanner } from './scanners/a2a-security-scanner';
 export { npmAttestationScanner } from './scanners/npm-attestation-scanner';
+export { mcpSamplingAbuseScanner } from './scanners/mcp-sampling-abuse-scanner';
 export { walkFiles } from './utils/file-walker';
 export * from './types';
 
@@ -64,6 +65,7 @@ import { mcpToolResultInjectionScanner } from './scanners/mcp-tool-result-inject
 import { mcpGitCveScanner } from './scanners/mcp-git-cve-scanner';
 import { a2aSecurityScanner } from './scanners/a2a-security-scanner';
 import { npmAttestationScanner } from './scanners/npm-attestation-scanner';
+import { mcpSamplingAbuseScanner } from './scanners/mcp-sampling-abuse-scanner';
 
 export function createDefaultRegistry(externalIOCPath?: string): ScannerRegistry {
   const registry = new ScannerRegistry();
@@ -100,6 +102,7 @@ export function createDefaultRegistry(externalIOCPath?: string): ScannerRegistry
   registry.register(mcpToolResultInjectionScanner as unknown as Scanner);
   registry.register(mcpGitCveScanner as unknown as Scanner);
   registry.register(a2aSecurityScanner as unknown as Scanner);
+  registry.register(mcpSamplingAbuseScanner as unknown as Scanner);
 
   return registry;
 }
