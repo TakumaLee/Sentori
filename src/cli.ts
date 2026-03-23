@@ -12,6 +12,7 @@ import { customRulesScanner } from './scanners/custom-rules-scanner';
 import { applyConfig } from './utils/apply-config';
 import { printConfigWarnings } from './utils/print-warnings';
 import { runDiscover } from './discover';
+import { CUSTOM_RULES_SCANNER_NAME } from './scanners/custom-rules-scanner';
 
 // ─── Profile filtering ──────────────────────────────────────────────────────
 
@@ -252,6 +253,33 @@ async function main(): Promise<void> {
   // Always recalculate after config application to reflect filtered findings
   report.summary = calculateSummary(report.results);
   report.version = version;
+
+  // Surface .sentori.yml config warnings as info findings so they appear in JSON/SARIF
+  if (sentoriConfig && sentoriConfig.warnings.length > 0) {
+    const warningFindings = sentoriConfig.warnings.map((warning, idx) => ({
+      id: `CONFIG-WARNING-${idx}`,
+      scanner: CUSTOM_RULES_SCANNER_NAME,
+      severity: 'info' as const,
+      rule: 'CONFIG-WARNING',
+      title: '[Config] Rule configuration warning',
+      message: warning,
+      description: warning,
+      recommendation: 'Fix the rule definition in .sentori.yml to ensure it is scanned correctly.',
+    }));
+
+    const existingCustomResult = report.results.find(r => r.scanner === CUSTOM_RULES_SCANNER_NAME);
+    if (existingCustomResult) {
+      existingCustomResult.findings.unshift(...warningFindings);
+    } else {
+      report.results.push({
+        scanner: CUSTOM_RULES_SCANNER_NAME,
+        findings: warningFindings,
+        duration: 0,
+      });
+    }
+    // Recalculate summary after adding warning findings
+    report.summary = calculateSummary(report.results);
+  }
 
   if (sarifMode && outputPath) {
     // --format sarif --output file.sarif
