@@ -11,6 +11,7 @@ import { loadSentoriConfig, SentoriConfig } from './config/sentori-config';
 import { customRulesScanner } from './scanners/custom-rules-scanner';
 import { applyConfig } from './utils/apply-config';
 import { printConfigWarnings } from './utils/print-warnings';
+import { runDiscover } from './discover';
 
 // ─── Profile filtering ──────────────────────────────────────────────────────
 
@@ -78,6 +79,7 @@ function printHelp(): void {
   console.log(chalk.gray('    --profile PROFILE  Filter scanners by profile: agent (default), general, mobile'));
   console.log(chalk.gray('    --require-provenance   Exit 1 if any packages lack npm attestation'));
   console.log(chalk.gray('    --include-vendored   Include vendored/third-party code in scan'));
+  console.log(chalk.gray('    --discover         Auto-discover and scan agent configs in common paths'));
   console.log('');
   console.log(chalk.bold('  Examples:'));
   console.log(chalk.cyan('    npx @nexylore/sentori scan'));
@@ -87,6 +89,7 @@ function printHelp(): void {
   console.log(chalk.cyan('    npx @nexylore/sentori scan ./my-agent --output report.json'));
   console.log(chalk.cyan('    npx @nexylore/sentori scan ./my-agent --output results.sarif'));
   console.log(chalk.cyan('    npx @nexylore/sentori scan ./my-agent --ioc ./custom-ioc.json'));
+  console.log(chalk.cyan('    npx @nexylore/sentori --discover'));
   console.log('');
 }
 
@@ -100,6 +103,11 @@ async function main(): Promise<void> {
 
   if (args.includes('--version') || args.includes('-v')) {
     console.log(getVersion());
+    process.exit(0);
+  }
+
+  if (args.includes('--discover')) {
+    await runDiscover();
     process.exit(0);
   }
 
