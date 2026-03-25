@@ -413,7 +413,7 @@ export class AgenticFrameworkScanner implements Scanner {
     const extensions = new Set(['.py', '.ts', '.js', '.jsx', '.tsx', '.json', '.yaml', '.yml', '.toml', '.env']);
     const files = walkFiles(targetDir, {
       extensions,
-      // Also pick up .env files (no extension match needed, they're dotfiles)
+      includeVendored: options?.includeVendored,
     });
 
     // Additionally walk for .env files which walkFiles might miss (no extension)

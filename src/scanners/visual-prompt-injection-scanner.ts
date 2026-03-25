@@ -18,13 +18,13 @@ export class VisualPromptInjectionScanner implements Scanner {
   name = 'Visual Prompt Injection Scanner';
   description = 'Detects suspicious image processing + LLM vision API combinations and scans image files for embedded prompt injection text';
 
-  async scan(targetPath: string): Promise<ScanResult> {
+  async scan(targetPath: string, options?: ScannerOptions): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
     let scannedFiles = 0;
 
     // Scan code files
-    for (const file of walkFiles(targetPath)) {
+    for (const file of walkFiles(targetPath, { includeVendored: options?.includeVendored })) {
       if (this.isCodeFile(file.path)) {
         scannedFiles++;
         const codeFindings = this.scanFile(file);

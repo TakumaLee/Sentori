@@ -260,9 +260,9 @@ export class ConventionSquattingScanner implements Scanner {
     this.maxPackageQueries = opts?.maxPackageQueries ?? DEFAULT_MAX_PACKAGE_QUERIES;
   }
 
-  async scan(targetDir: string): Promise<ScanResult> {
+  async scan(targetDir: string, options?: ScannerOptions): Promise<ScanResult> {
     const start = Date.now();
-    const files = walkFiles(targetDir);
+    const files = walkFiles(targetDir, { includeVendored: options?.includeVendored });
     const findings: Finding[] = [];
 
     // Scan node_modules if enabled
