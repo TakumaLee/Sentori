@@ -30,6 +30,7 @@ export { a2aSecurityScanner } from './scanners/a2a-security-scanner';
 export { npmAttestationScanner } from './scanners/npm-attestation-scanner';
 export { mcpSamplingAbuseScanner } from './scanners/mcp-sampling-abuse-scanner';
 export { githubToxicFlowScanner } from './scanners/github-toxic-flow-scanner';
+export { mcpOAuthAuditor } from './scanners/mcp-oauth-auditor';
 export { walkFiles } from './utils/file-walker';
 export * from './types';
 
@@ -68,6 +69,7 @@ import { a2aSecurityScanner } from './scanners/a2a-security-scanner';
 import { npmAttestationScanner } from './scanners/npm-attestation-scanner';
 import { mcpSamplingAbuseScanner } from './scanners/mcp-sampling-abuse-scanner';
 import { githubToxicFlowScanner } from './scanners/github-toxic-flow-scanner';
+import { mcpOAuthAuditor } from './scanners/mcp-oauth-auditor';
 
 export function createDefaultRegistry(externalIOCPath?: string): ScannerRegistry {
   const registry = new ScannerRegistry();
@@ -106,6 +108,7 @@ export function createDefaultRegistry(externalIOCPath?: string): ScannerRegistry
   registry.register(a2aSecurityScanner as unknown as Scanner);
   registry.register(mcpSamplingAbuseScanner as unknown as Scanner);
   registry.register(githubToxicFlowScanner as unknown as Scanner);
+  registry.register(mcpOAuthAuditor as unknown as Scanner);
 
   return registry;
 }
