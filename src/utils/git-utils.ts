@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -13,13 +13,13 @@ export function isGitTracked(filePath: string): boolean | null {
     const basename = path.basename(filePath);
 
     // Check if this is a git repo
-    execSync('git rev-parse --is-inside-work-tree', {
+    execFileSync('git', ['rev-parse', '--is-inside-work-tree'], {
       cwd: dir,
       stdio: 'pipe',
     });
 
-    // Check if file is tracked
-    const result = execSync(`git ls-files --error-unmatch "${basename}"`, {
+    // Check if file is tracked — use execFileSync to avoid shell injection
+    execFileSync('git', ['ls-files', '--error-unmatch', basename], {
       cwd: dir,
       stdio: 'pipe',
     });
@@ -30,7 +30,7 @@ export function isGitTracked(filePath: string): boolean | null {
     // Distinguish between "not a git repo" and "file not tracked"
     try {
       const dir = path.dirname(filePath);
-      execSync('git rev-parse --is-inside-work-tree', {
+      execFileSync('git', ['rev-parse', '--is-inside-work-tree'], {
         cwd: dir,
         stdio: 'pipe',
       });
@@ -52,7 +52,7 @@ export function isGitIgnored(filePath: string): boolean {
     const dir = path.dirname(filePath);
     const basename = path.basename(filePath);
 
-    execSync(`git check-ignore -q "${basename}"`, {
+    execFileSync('git', ['check-ignore', '-q', basename], {
       cwd: dir,
       stdio: 'pipe',
     });
@@ -83,7 +83,7 @@ export function getGitTrackingStatus(targetPath: string, files: string[]): Map<s
 
   // Check if target is a git repo
   try {
-    execSync('git rev-parse --is-inside-work-tree', {
+    execFileSync('git', ['rev-parse', '--is-inside-work-tree'], {
       cwd: targetPath,
       stdio: 'pipe',
     });
@@ -96,7 +96,7 @@ export function getGitTrackingStatus(targetPath: string, files: string[]): Map<s
   // Get all tracked files
   let trackedFiles: Set<string>;
   try {
-    const output = execSync('git ls-files', {
+    const output = execFileSync('git', ['ls-files'], {
       cwd: targetPath,
       stdio: 'pipe',
       maxBuffer: 10 * 1024 * 1024, // 10MB buffer for large repos
