@@ -225,5 +225,25 @@ describe('Channel Surface Auditor', () => {
       expect(findings[0].severity).toBe('high');
       expect(findings[1].severity).toBe('info');
     });
+
+    test('all findings have confidence set', () => {
+      const results: ChannelAuditResult[] = [
+        {
+          channelId: 'CH-EMAIL',
+          channelName: 'Email/Gmail',
+          detected: true,
+          detectedIn: ['/test/agent.md'],
+          defenseCount: 0,
+          defenses: [],
+          status: 'undefended',
+        },
+      ];
+      const findings = generateChannelFindings(results, '/test');
+      expect(findings.length).toBeGreaterThan(0);
+      for (const f of findings) {
+        expect(f.confidence).toBeDefined();
+        expect(['definite', 'likely', 'possible']).toContain(f.confidence);
+      }
+    });
   });
 });

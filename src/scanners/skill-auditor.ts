@@ -1,5 +1,5 @@
 import { ScannerModule, ScanResult, Finding, Severity, ScanContext, ScannerOptions } from '../types';
-import { findFiles, readFileContent, isTestOrDocFile, isFrameworkInfraFile, isUserInputFile, isSkillPluginFile, isSentoriTestFile, isSentoriSourceFile, isSecurityToolFile, isMarkdownFile, isTestFileForScoring } from '../utils/file-utils';
+import { findFiles, readFileContent, isTestOrDocFile, isFrameworkInfraFile, isUserInputFile, isSkillPluginFile, isSentoriTestFile, isSentoriSourceFile, isSecurityToolFile, isMarkdownFile, isTestFileForScoring, applyContextDowngrades } from '../utils/file-utils';
 
 interface SkillPattern {
   id: string;
@@ -242,6 +242,7 @@ export function auditSkillContent(content: string, filePath: string): Finding[] 
         file: filePath,
         line: matchLine,
         recommendation: sp.recommendation,
+        confidence: 'likely',
       });
     }
   }
@@ -322,28 +323,8 @@ export const skillAuditor: ScannerModule = {
         }
 
         // Sentori's own source/test files: pattern definitions, not vulnerabilities
-        if (isSentoriTestFile(file)) {
-          for (const f of fileFindings) {
-            if (f.severity !== 'info') {
-              f.severity = 'info';
-              f.description += ' [security tool test file — intentional attack sample]';
-            }
-          }
-        } else if (isSentoriSourceFile(file)) {
-          for (const f of fileFindings) {
-            if (f.severity !== 'info') {
-              f.severity = 'info';
-              f.description += ' [Sentori source file — pattern definition, not a vulnerability]';
-            }
-          }
-        } else if (isTestOrDocFile(file)) {
-          // Downgrade test/doc findings
-          for (const f of fileFindings) {
-            if (f.severity === 'critical') f.severity = 'medium';
-            else if (f.severity === 'high') f.severity = 'info';
-            f.description += ' [test/doc file — severity reduced]';
-          }
-        }
+        // Test/doc: severity reduced.
+        applyContextDowngrades(fileFindings, file);
 
         // Security tools (detector, scanner, auditor, guard) reading credential
         // paths is normal behavior — they need to detect credential leaks
@@ -361,9 +342,6 @@ export const skillAuditor: ScannerModule = {
         // Skip unreadable files
       }
     }
-
-    // Confidence: likely — static analysis, patterns may have false positives
-    for (const f of findings) f.confidence = 'likely';
 
     return {
       scanner: 'Skill Auditor',

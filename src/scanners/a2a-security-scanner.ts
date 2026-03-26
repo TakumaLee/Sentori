@@ -81,20 +81,40 @@ const BROAD_CAPABILITY_COMBO = ['streaming', 'pushNotifications', 'stateTransiti
 
 // ─── HTTP fetch helper ────────────────────────────────────────────────────────
 
-function fetchUrl(url: string, timeoutMs = 8000): Promise<string> {
+function fetchUrl(url: string, timeoutMs = 8000, maxRedirects = 3): Promise<string> {
   return new Promise((resolve, reject) => {
-    const mod = url.startsWith('https://') ? https : http;
-    const req = (mod as typeof https).get(url, { timeout: timeoutMs }, (res) => {
-      const chunks: Buffer[] = [];
-      res.on('data', (chunk: Buffer) => chunks.push(chunk));
-      res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-      res.on('error', reject);
-    });
-    req.on('error', reject);
-    req.on('timeout', () => {
-      req.destroy();
-      reject(new Error(`Request to ${url} timed out after ${timeoutMs}ms`));
-    });
+    const attempt = (currentUrl: string, hopsLeft: number): void => {
+      const mod = currentUrl.startsWith('https://') ? https : http;
+      const req = (mod as typeof https).get(currentUrl, { timeout: timeoutMs }, (res) => {
+        const status = res.statusCode ?? 0;
+        // Follow 301/302/303/307/308 redirects
+        if ((status === 301 || status === 302 || status === 303 || status === 307 || status === 308) && res.headers.location) {
+          res.resume(); // drain response
+          if (hopsLeft <= 0) {
+            reject(new Error(`Too many redirects fetching ${url}`));
+            return;
+          }
+          // Resolve relative redirect URLs against the current URL
+          let next = res.headers.location;
+          if (!next.startsWith('http://') && !next.startsWith('https://')) {
+            const base = new URL(currentUrl);
+            next = new URL(next, base).toString();
+          }
+          attempt(next, hopsLeft - 1);
+          return;
+        }
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk: Buffer) => chunks.push(chunk));
+        res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+        res.on('error', reject);
+      });
+      req.on('error', reject);
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error(`Request to ${currentUrl} timed out after ${timeoutMs}ms`));
+      });
+    };
+    attempt(url, maxRedirects);
   });
 }
 
@@ -131,7 +151,7 @@ async function resolveAgentCard(input: string): Promise<{ card: A2AAgentCard; so
 
 // ─── Audit functions ──────────────────────────────────────────────────────────
 
-function auditAuthentication(card: A2AAgentCard, source: string): Finding[] {
+export function auditAuthentication(card: A2AAgentCard, source: string): Finding[] {
   const findings: Finding[] = [];
 
   const auth = card.authentication;
@@ -202,7 +222,7 @@ function auditAuthentication(card: A2AAgentCard, source: string): Finding[] {
   return findings;
 }
 
-function auditEndpoints(card: A2AAgentCard, sourceIsHttp: boolean, source: string): Finding[] {
+export function auditEndpoints(card: A2AAgentCard, sourceIsHttp: boolean, source: string): Finding[] {
   const findings: Finding[] = [];
 
   // Top-level url
@@ -259,7 +279,7 @@ function auditEndpoints(card: A2AAgentCard, sourceIsHttp: boolean, source: strin
   return findings;
 }
 
-function auditCapabilities(card: A2AAgentCard, source: string): Finding[] {
+export function auditCapabilities(card: A2AAgentCard, source: string): Finding[] {
   const findings: Finding[] = [];
   const caps = card.capabilities;
   if (!caps || typeof caps !== 'object') return findings;
@@ -296,7 +316,7 @@ function auditCapabilities(card: A2AAgentCard, source: string): Finding[] {
   return findings;
 }
 
-function auditInputModes(card: A2AAgentCard, source: string): Finding[] {
+export function auditInputModes(card: A2AAgentCard, source: string): Finding[] {
   const findings: Finding[] = [];
 
   // Collect all inputModes from top-level and skills
@@ -418,8 +438,19 @@ export const a2aSecurityScanner: ScannerModule = {
         for (const f of cardFindings) f.confidence = 'definite';
         findings.push(...cardFindings);
       } catch (err) {
-        // Unreachable / unparseable targets are silently skipped
-        // (consistent with other scanners in this codebase)
+        // Emit an info finding so the user knows a target was unreachable / unparseable
+        const reason = err instanceof Error ? err.message : String(err);
+        findings.push({
+          id: 'A2A-000',
+          scanner: SCANNER_ID,
+          severity: 'info',
+          rule: 'target-unreachable',
+          title: `Could not fetch or parse agent card: ${target}`,
+          description: `The target "${target}" was skipped because it could not be fetched or parsed. Reason: ${reason}`,
+          file: target,
+          recommendation: 'Verify the target URL or file path is reachable and contains valid JSON.',
+          confidence: 'definite',
+        });
       }
     }
 

@@ -1,5 +1,5 @@
 import { ScannerModule, ScanResult, Finding, ScanContext, ScannerOptions } from '../types';
-import { findPromptFiles, readFileContent, isTestOrDocFile, isCredentialManagementFile, isSentoriTestFile, isSentoriSourceFile, isMarkdownFile, isInCommentOrCodeBlock, isTestFileForScoring } from '../utils/file-utils';
+import { findPromptFiles, readFileContent, isTestOrDocFile, isCredentialManagementFile, isSentoriTestFile, isSentoriSourceFile, isMarkdownFile, isInCommentOrCodeBlock, isTestFileForScoring, applyContextDowngrades } from '../utils/file-utils';
 import { SECRET_PATTERNS, SENSITIVE_PATH_PATTERNS } from '../patterns/injection-patterns';
 import { getGitTrackingStatus } from '../utils/git-utils';
 
@@ -36,36 +36,14 @@ export const secretLeakScanner: ScannerModule = {
         }
 
         // Sentori's own source/test files: pattern definitions, not real secrets
+        // Markdown: documentation. Test/doc: severity reduced.
         if (isSentoriTestFile(file)) {
-          for (const f of fileFindings) {
-            if (f.severity !== 'info') {
-              f.severity = 'info';
-              f.description += ' [security tool test file — intentional attack sample]';
-            }
-            f.isTestFile = true;
-          }
-        } else if (isSentoriSourceFile(file)) {
-          for (const f of fileFindings) {
-            if (f.severity !== 'info') {
-              f.severity = 'info';
-              f.description += ' [Sentori source file — pattern definition, not a real secret]';
-            }
-          }
-        } else if (isMarkdownFile(file)) {
-          // Markdown files discussing security topics are documentation
-          for (const f of fileFindings) {
-            if (f.severity === 'critical') f.severity = 'medium';
-            else if (f.severity === 'high') f.severity = 'info';
-            f.description += ' [markdown file — technical discussion, not a real secret]';
-          }
-        } else if (isTestOrDocFile(file)) {
-          // Downgrade test/doc findings
-          for (const f of fileFindings) {
-            if (f.severity === 'critical') f.severity = 'medium';
-            else if (f.severity === 'high') f.severity = 'info';
-            f.description += ' [test/doc file — severity reduced]';
-          }
+          for (const f of fileFindings) f.isTestFile = true;
         }
+        applyContextDowngrades(fileFindings, file, {
+          sentoriSource: '[Sentori source file — pattern definition, not a real secret]',
+          markdown: '[markdown file — technical discussion, not a real secret]',
+        });
 
         // Git-tracking aware severity adjustment for API keys / tokens
         const trackingStatus = gitStatus.get(file) || 'unknown';
@@ -99,9 +77,6 @@ export const secretLeakScanner: ScannerModule = {
         // Skip unreadable files
       }
     }
-
-    // Confidence: definite — pattern-matched secrets are concrete evidence
-    for (const f of findings) f.confidence = 'definite';
 
     return {
       scanner: 'Secret Leak Scanner',
@@ -149,6 +124,7 @@ export function scanForSecrets(content: string, filePath?: string): Finding[] {
           recommendation: severity === 'critical'
             ? 'Remove hardcoded secrets. Use environment variables, secret managers, or vault services instead.'
             : 'Verify this is not a real secret. If it is, move to environment variables or a secret manager.',
+          confidence: 'definite',
         });
       }
     }
@@ -201,6 +177,7 @@ export function scanForSensitivePaths(content: string, filePath?: string): Findi
           recommendation: severity === 'info'
             ? 'This appears to be a documentation reference or example file. Verify no real secrets are exposed.'
             : 'Avoid referencing sensitive system paths in prompts or tool definitions. These paths can be used for social engineering attacks.',
+          confidence: 'definite',
         });
       }
     }
@@ -294,6 +271,7 @@ export function scanForHardcodedCredentials(content: string, filePath?: string):
           recommendation: severity === 'info'
             ? 'This appears to be a development/example value. Ensure it is not used in production.'
             : 'Use environment variables or configuration files outside the repository for credentials.',
+          confidence: 'definite',
         });
       }
     }

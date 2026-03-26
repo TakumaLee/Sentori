@@ -239,5 +239,14 @@ describe('Defense Analyzer', () => {
       const findings = aggregateAndGenerate('nothing here');
       expect(findings.every(f => f.recommendation.length > 0)).toBe(true);
     });
+
+    test('all findings have confidence set', () => {
+      const findings = aggregateAndGenerate('nothing here');
+      expect(findings.length).toBeGreaterThan(0);
+      for (const f of findings) {
+        expect(f.confidence).toBeDefined();
+        expect(['definite', 'likely', 'possible']).toContain(f.confidence);
+      }
+    });
   });
 });

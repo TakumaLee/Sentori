@@ -224,8 +224,8 @@ describe('Cross-Channel Identity Spoofing Patterns', () => {
 });
 
 describe('Pattern counts', () => {
-  it('should have all 199 patterns', () => {
-    expect(INJECTION_PATTERNS.length).toBe(199);
+  it('should have all 207 patterns', () => {
+    expect(INJECTION_PATTERNS.length).toBe(207);
   });
 
   it('should have unique IDs', () => {

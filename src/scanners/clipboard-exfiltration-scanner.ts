@@ -62,8 +62,8 @@ export const clipboardExfiltrationScanner: ScannerModule = {
       const isTestFile = isTestOrDocFile(file);
       const isSentoriSrc = isSentoriSourceFile(file);
 
-      // Skip Sentori's own source (unless explicitly vendored/copied)
-      if (isSentoriSrc && !options?.includeVendored) continue;
+      // Skip Sentori's own source
+      if (isSentoriSrc) continue;
 
       const content = readFileContent(file);
       const lines = content.split('\n');

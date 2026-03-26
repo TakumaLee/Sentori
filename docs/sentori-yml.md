@@ -67,3 +67,22 @@ Each entry suppresses findings where **all specified fields match**:
 | `scanner` | string | yes | Scanner name to apply override to |
 | `rule` | string | no | Restrict to specific rule ID |
 | `severity` | `critical\|high\|medium\|info` | yes | Target severity |
+
+## ReDoS Warning
+
+Custom rule patterns are compiled as ECMAScript regex and executed against each line of scanned files.
+**Avoid patterns that can cause catastrophic backtracking**, which may hang the scanner indefinitely:
+
+| Dangerous pattern | Why |
+|---|---|
+| `(a+)+`, `(\w+)*` | Nested quantifiers — exponential backtracking |
+| `(foo\|foobar)+` | Alternation where branches overlap + outer quantifier |
+| `(a*)*` | Redundant quantifier nesting |
+
+Sentori emits a **warning** (not an error) when it detects these patterns heuristically, but the
+heuristic is not exhaustive. Always test your patterns on representative inputs before deploying to CI.
+
+**Safe alternatives:**
+- Use possessive quantifiers where possible (e.g. `[A-Z0-9]{16}` instead of `([A-Z0-9]+)+`)
+- Anchor patterns to avoid unnecessary backtracking (e.g. `^` / `$` / `\b`)
+- Test with [regex101.com](https://regex101.com) using the "Catastrophic Backtracking" debugger

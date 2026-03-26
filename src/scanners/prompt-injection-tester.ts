@@ -1,6 +1,6 @@
 import { ScannerModule, ScanResult, Finding, ScannerOptions } from '../types';
 import { INJECTION_PATTERNS } from '../patterns/injection-patterns';
-import { findPromptFiles, readFileContent, isTestOrDocFile, isJsonFile, isYamlFile, tryParseJson, isSentoriTestFile, isSentoriSourceFile, isMarkdownFile, isTestFileForScoring } from '../utils/file-utils';
+import { findPromptFiles, readFileContent, isTestOrDocFile, isJsonFile, isYamlFile, tryParseJson, isSentoriTestFile, isSentoriSourceFile, isMarkdownFile, isTestFileForScoring, applyContextDowngrades } from '../utils/file-utils';
 
 export const promptInjectionTester: ScannerModule = {
   name: 'Prompt Injection Tester',
@@ -35,35 +35,11 @@ export const promptInjectionTester: ScannerModule = {
 
         const fileFindings = scanContent(content, file);
         // Sentori's own source/test files: pattern definitions, not attacks
-        if (isSentoriTestFile(file)) {
-          for (const f of fileFindings) {
-            if (f.severity !== 'info') {
-              f.severity = 'info';
-              f.description += ' [security tool test file — intentional attack sample]';
-            }
-          }
-        } else if (isSentoriSourceFile(file)) {
-          for (const f of fileFindings) {
-            if (f.severity !== 'info') {
-              f.severity = 'info';
-              f.description += ' [Sentori source file — pattern definition, not an attack]';
-            }
-          }
-        } else if (isMarkdownFile(file)) {
-          // Markdown files discussing attack techniques are documentation, not attacks
-          for (const f of fileFindings) {
-            if (f.severity === 'critical') f.severity = 'medium';
-            else if (f.severity === 'high') f.severity = 'info';
-            f.description += ' [markdown file — technical discussion, not an attack]';
-          }
-        } else if (isTestOrDocFile(file)) {
-          // Downgrade test/doc findings: critical→medium, high→info
-          for (const f of fileFindings) {
-            if (f.severity === 'critical') f.severity = 'medium';
-            else if (f.severity === 'high') f.severity = 'info';
-            f.description += ' [test/doc file — severity reduced]';
-          }
-        }
+        // Markdown: documentation, not attacks. Test/doc: severity reduced.
+        applyContextDowngrades(fileFindings, file, {
+          sentoriSource: '[Sentori source file — pattern definition, not an attack]',
+          markdown: '[markdown file — technical discussion, not an attack]',
+        });
 
         // Mark test file findings for scoring exclusion
         if (isTestFileForScoring(file)) {
@@ -80,9 +56,6 @@ export const promptInjectionTester: ScannerModule = {
         // Skip unreadable files
       }
     }
-
-    // Confidence: definite — direct pattern matches in prompt content
-    for (const f of findings) f.confidence = 'definite';
 
     return {
       scanner: 'Prompt Injection Tester',
@@ -132,6 +105,7 @@ export function scanContent(content: string, filePath?: string): Finding[] {
             file: filePath,
             line: i + 1,
             recommendation: getRecommendation(attackPattern.category),
+            confidence: 'definite',
           });
         }
       }
@@ -164,6 +138,7 @@ export function scanContent(content: string, filePath?: string): Finding[] {
             file: filePath,
             line: 0,
             recommendation: getRecommendation(attackPattern.category),
+            confidence: 'definite',
           });
         }
       }
@@ -276,7 +251,7 @@ export function isDefensePatternFile(content: string, filePath?: string): boolea
   // Signal 3: File matching many injection categories AND path is defensive.
   // Requiring both prevents comprehensive attack files from self-classifying as defense.
   if (pathIsDefensive && (!filePath || !isJsonFile(filePath))) {
-    if (countMatchedCategories(content) > 5) return true;
+    if (countMatchedCategories(content) >= 8) return true;
   }
 
   return false;

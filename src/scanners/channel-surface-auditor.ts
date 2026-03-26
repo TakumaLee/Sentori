@@ -1,6 +1,8 @@
 import * as path from 'path';
+import * as fs from 'fs';
+import * as readline from 'readline';
 import { ScannerModule, ScanResult, Finding, Severity, ScannerOptions } from '../types';
-import { findPromptFiles, findConfigFiles, findFiles, readFileContent, isTestOrDocFile, isTestFileForScoring } from '../utils/file-utils';
+import { findPromptFiles, findConfigFiles, findFiles, isTestOrDocFile, isTestFileForScoring } from '../utils/file-utils';
 
 export interface ChannelDefinition {
   id: string;
@@ -312,6 +314,7 @@ export function generateChannelFindings(auditResults: ChannelAuditResult[], targ
         description: `Agent has access to ${result.channelName} but no channel-specific defenses were found. An attacker could exploit this channel to inject instructions or exfiltrate data.`,
         file: targetPath,
         recommendation: `Add channel-specific defenses for ${result.channelName}. ${getChannelRecommendation(result.channelId)}`,
+        confidence: 'likely',
       });
     } else if (result.status === 'partial') {
       findings.push({
@@ -322,6 +325,7 @@ export function generateChannelFindings(auditResults: ChannelAuditResult[], targ
         description: `Agent has access to ${result.channelName} with some defenses (${result.defenses.join(', ')}), but coverage is incomplete.`,
         file: targetPath,
         recommendation: `Strengthen defenses for ${result.channelName}. ${getChannelRecommendation(result.channelId)}`,
+        confidence: 'likely',
       });
     } else {
       // defended — info level
@@ -333,6 +337,7 @@ export function generateChannelFindings(auditResults: ChannelAuditResult[], targ
         description: `Agent has access to ${result.channelName} with adequate defenses (${result.defenses.join(', ')}).`,
         file: targetPath,
         recommendation: 'Continue monitoring and updating channel defenses.',
+        confidence: 'likely',
       });
     }
   }
@@ -356,6 +361,95 @@ function getChannelRecommendation(channelId: string): string {
   return recommendations[channelId] || '';
 }
 
+/**
+ * Stream a file line by line, detecting channel patterns and defense patterns.
+ * Avoids loading the entire file into memory at once.
+ */
+async function streamScanFile(
+  filePath: string,
+  channelDefinitions: ChannelDefinition[]
+): Promise<{ channelDetections: Set<string>; channelDefenses: Map<string, string[]> }> {
+  const channelDetections = new Set<string>();
+  const channelDefenses = new Map<string, string[]>(
+    channelDefinitions.map(ch => [ch.id, []])
+  );
+
+  return new Promise((resolve) => {
+    let readStream: fs.ReadStream;
+    try {
+      readStream = fs.createReadStream(filePath, { encoding: 'utf-8', highWaterMark: 64 * 1024 });
+    } catch {
+      resolve({ channelDetections, channelDefenses });
+      return;
+    }
+
+    const rl = readline.createInterface({ input: readStream, crlfDelay: Infinity });
+
+    rl.on('line', (line) => {
+      for (const ch of channelDefinitions) {
+        if (!channelDetections.has(ch.id) && ch.detectPatterns.some(p => p.test(line))) {
+          channelDetections.add(ch.id);
+        }
+        const defenseList = channelDefenses.get(ch.id)!;
+        for (const dp of ch.defensePatterns) {
+          if (!defenseList.includes(dp.desc) && dp.pattern.test(line)) {
+            defenseList.push(dp.desc);
+          }
+        }
+      }
+    });
+
+    const done = () => resolve({ channelDetections, channelDefenses });
+    rl.on('close', done);
+    rl.on('error', done);
+    readStream.on('error', () => { rl.close(); });
+  });
+}
+
+/**
+ * Stream a file line by line, searching for code-level evidence of channel integrations.
+ * Exits early once all remaining channels have been confirmed.
+ */
+async function streamScanForCodeEvidence(
+  filePath: string,
+  channelsNeedingEvidence: ChannelDefinition[],
+  alreadyFound: Set<string>
+): Promise<Set<string>> {
+  const found = new Set<string>();
+  const remaining = channelsNeedingEvidence.filter(ch => !alreadyFound.has(ch.id));
+  if (remaining.length === 0) return found;
+
+  return new Promise((resolve) => {
+    let readStream: fs.ReadStream;
+    try {
+      readStream = fs.createReadStream(filePath, { encoding: 'utf-8', highWaterMark: 64 * 1024 });
+    } catch {
+      resolve(found);
+      return;
+    }
+
+    const rl = readline.createInterface({ input: readStream, crlfDelay: Infinity });
+
+    rl.on('line', (line) => {
+      for (const ch of remaining) {
+        if (!found.has(ch.id) && ch.codeEvidencePatterns!.some(p => p.test(line))) {
+          found.add(ch.id);
+        }
+      }
+      // Early exit: all remaining channels found in this file
+      if (remaining.every(ch => found.has(ch.id))) {
+        rl.close();
+        readStream.destroy();
+      }
+    });
+
+    const done = () => resolve(found);
+    rl.on('close', done);
+    rl.on('error', done);
+    readStream.on('error', () => { rl.close(); });
+  });
+}
+
 export const channelSurfaceAuditor: ScannerModule = {
   name: 'Channel Surface Auditor',
   description: 'Detects which external channels the agent controls and checks whether each channel has adequate defenses',
@@ -373,37 +467,27 @@ export const channelSurfaceAuditor: ScannerModule = {
     const sourceFiles = await findFiles(targetPath, [
       '**/*.ts', '**/*.js', '**/*.py', '**/*.sh',
     ], options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns);
-    const allSourceContent = new Map<string, string>();
-    for (const file of sourceFiles) {
-      try {
-        allSourceContent.set(file, readFileContent(file));
-      } catch { /* skip */ }
-    }
 
-    // Build a set of channels that have code-level evidence
+    // Build a set of channels that have code-level evidence.
+    // Channels without codeEvidencePatterns are always confirmed.
     const channelsWithCodeEvidence = new Set<string>();
     for (const ch of CHANNEL_DEFINITIONS) {
       if (!ch.codeEvidencePatterns) {
-        // No code evidence required — always confirm if detected
         channelsWithCodeEvidence.add(ch.id);
-        continue;
       }
-      for (const [, content] of allSourceContent) {
-        if (ch.codeEvidencePatterns.some(p => p.test(content))) {
-          channelsWithCodeEvidence.add(ch.id);
-          break;
-        }
-      }
-      // Also check prompt/config files for code evidence
-      if (!channelsWithCodeEvidence.has(ch.id)) {
-        for (const file of allFiles) {
-          try {
-            const content = readFileContent(file);
-            if (ch.codeEvidencePatterns.some(p => p.test(content))) {
-              channelsWithCodeEvidence.add(ch.id);
-              break;
-            }
-          } catch { /* skip */ }
+    }
+
+    // For channels that require code evidence, stream files with early exit
+    const channelsNeedingEvidence = CHANNEL_DEFINITIONS.filter(
+      ch => ch.codeEvidencePatterns && !channelsWithCodeEvidence.has(ch.id)
+    );
+    if (channelsNeedingEvidence.length > 0) {
+      const filesToCheck = [...sourceFiles, ...allFiles];
+      for (const file of filesToCheck) {
+        if (channelsNeedingEvidence.every(ch => channelsWithCodeEvidence.has(ch.id))) break;
+        const found = await streamScanForCodeEvidence(file, channelsNeedingEvidence, channelsWithCodeEvidence);
+        for (const id of found) {
+          channelsWithCodeEvidence.add(id);
         }
       }
     }
@@ -422,31 +506,21 @@ export const channelSurfaceAuditor: ScannerModule = {
       });
     }
 
-    // Pass 1: Detect channels and check defenses
+    // Pass 1: Stream each file for channel detection and defense patterns
     for (const file of allFiles) {
-      try {
-        const content = readFileContent(file);
+      const { channelDetections, channelDefenses } = await streamScanFile(file, CHANNEL_DEFINITIONS);
 
-        // Detect channels
-        const detections = detectChannels(content, file);
-        for (const d of detections) {
-          if (d.detected) {
-            const result = channelResults.get(d.channelId)!;
-            result.detected = true;
-            result.detectedIn.push(file);
-          }
-        }
+      for (const id of channelDetections) {
+        const result = channelResults.get(id)!;
+        result.detected = true;
+        result.detectedIn.push(file);
+      }
 
-        // Check defenses for all channels
-        for (const ch of CHANNEL_DEFINITIONS) {
-          const { defenses } = checkChannelDefenses(content, ch.id);
-          if (defenses.length > 0) {
-            const result = channelResults.get(ch.id)!;
-            result.defenses.push(...defenses);
-          }
+      for (const [id, defenses] of channelDefenses) {
+        if (defenses.length > 0) {
+          const result = channelResults.get(id)!;
+          result.defenses.push(...defenses);
         }
-      } catch {
-        // Skip unreadable files
       }
     }
 
@@ -472,17 +546,15 @@ export const channelSurfaceAuditor: ScannerModule = {
     const channelFindings = generateChannelFindings(auditResults, targetPath);
 
     // Downgrade channels without code evidence to info
-    // (detected only via natural language mention, not actual integration)
     for (const f of channelFindings) {
-      const channelId = f.id!.split('-').slice(0, 2).join('-'); // e.g. CH-BROWSER
+      const channelId = f.id!.split('-').slice(0, 2).join('-');
       if (!channelsWithCodeEvidence.has(channelId) && f.severity !== 'info') {
         f.severity = 'info';
         f.description += ' [no code-level integration evidence found — mention only]';
       }
     }
 
-    // Downgrade test/doc findings — only for actual files, not directory paths
-    // Channel findings use targetPath (a directory) as file, so skip those
+    // Downgrade test/doc findings
     for (const f of channelFindings) {
       if (f.file && path.extname(f.file) !== '' && isTestOrDocFile(f.file)) {
         if (f.severity === 'critical') f.severity = 'medium';
@@ -492,9 +564,6 @@ export const channelSurfaceAuditor: ScannerModule = {
     }
 
     findings.push(...channelFindings);
-
-    // Confidence: likely — channel detection is heuristic-based
-    for (const f of findings) f.confidence = 'likely';
 
     return {
       scanner: 'Channel Surface Auditor',

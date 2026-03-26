@@ -1,6 +1,6 @@
 import * as yaml from 'js-yaml';
 import { ScannerModule, ScanResult, Finding, ScanContext, ScannerOptions } from '../types';
-import { findConfigFiles, findPromptFiles, readFileContent, isJsonFile, isYamlFile, tryParseJson, isTestOrDocFile, hasAuthFiles, findFiles, isCacheOrDataFile, isSentoriSourceFile, isMarkdownFile } from '../utils/file-utils';
+import { findConfigFiles, findPromptFiles, readFileContent, isJsonFile, isYamlFile, tryParseJson, isTestOrDocFile, hasAuthFiles, findFiles, isCacheOrDataFile, isSentoriSourceFile, isMarkdownFile, applyContextDowngrades } from '../utils/file-utils';
 
 export const permissionAnalyzer: ScannerModule = {
   name: 'Permission Analyzer',
@@ -73,15 +73,19 @@ export const permissionAnalyzer: ScannerModule = {
         const isManifest = SKIP_CONFIG_PATTERNS.some(p => p.test(file));
         // Chrome extension / web app manifest.json — not a tool config
         const isWebManifest = /manifest\.json$/i.test(file) && content.includes('"manifest_version"');
+
+        // Parse JSON/YAML once and reuse for both permission analysis and boundary analysis
+        let parsed: unknown = null;
+        let isStructuredToolConfig = false;
         if (!isManifest && !isWebManifest && (isJsonFile(file) || isYamlFile(file))) {
-          let parsed: unknown = null;
           if (isJsonFile(file)) parsed = tryParseJson(content);
           else if (isYamlFile(file)) parsed = yaml.load(content);
 
           if (parsed && typeof parsed === 'object') {
             const obj = parsed as Record<string, unknown>;
+            isStructuredToolConfig = isToolOrMcpConfig(obj);
             // Only run permission analysis on files that look like tool/MCP configs
-            if (isToolOrMcpConfig(obj)) {
+            if (isStructuredToolConfig) {
               const permFindings = analyzePermissions(obj, file);
               // Downgrade cache/data directory findings to info
               if (isCacheOrDataFile(file)) {
@@ -101,7 +105,7 @@ export const permissionAnalyzer: ScannerModule = {
         // Only for prompt-like files (.md, .txt), not data/cache files
         // Skip package manifests, dev tool configs — they aren't agent configs
         // Skip plain JSON data files — only code/config/prompt files should be text-analyzed
-        const isPlainJsonData = isJsonFile(file) && !isToolOrMcpConfigContent(file, content);
+        const isPlainJsonData = isJsonFile(file) && !isStructuredToolConfig;
         if (!isCacheOrDataFile(file) && !isManifest && !isWebManifest && !isPlainJsonData) {
           findings.push(...analyzeTextPermissions(content, file));
         }
@@ -111,12 +115,7 @@ export const permissionAnalyzer: ScannerModule = {
         if (!isCacheOrDataFile(file) && !isManifest && !isWebManifest) {
           if (isJsonFile(file) || isYamlFile(file)) {
             // For structured config files, only check if it looks like a tool config
-            let parsed: unknown = null;
-            try {
-              if (isJsonFile(file)) parsed = tryParseJson(content);
-              else if (isYamlFile(file)) parsed = yaml.load(content);
-            } catch { /* skip */ }
-            if (parsed && typeof parsed === 'object' && isToolOrMcpConfig(parsed as Record<string, unknown>)) {
+            if (isStructuredToolConfig) {
               findings.push(...analyzeToolPermissionBoundaries(content, file));
             }
           } else {
@@ -190,9 +189,6 @@ export const permissionAnalyzer: ScannerModule = {
       }
     }
 
-    // Confidence: likely — static analysis of permissions, may have false positives
-    for (const f of findings) f.confidence = 'likely';
-
     return {
       scanner: 'Permission Analyzer',
       findings,
@@ -226,6 +222,7 @@ export function analyzePermissions(config: Record<string, unknown>, filePath?: s
         description: 'The configuration defines tools/APIs but no rate limiting, throttling, or quota settings were found.',
         file: filePath,
         recommendation: 'Add rate limiting to prevent abuse. Configure per-tool or global request limits.',
+        confidence: 'likely',
       });
     }
   }
@@ -241,6 +238,7 @@ export function analyzePermissions(config: Record<string, unknown>, filePath?: s
         description: 'Server/API configuration found without apparent authentication settings.',
         file: filePath,
         recommendation: 'Add authentication configuration (API keys, tokens, or OAuth) to protect endpoints.',
+        confidence: 'likely',
       });
     }
   }
@@ -256,6 +254,7 @@ export function analyzePermissions(config: Record<string, unknown>, filePath?: s
         description: 'No logging, auditing, or monitoring settings found in the configuration.',
         file: filePath,
         recommendation: 'Enable logging for all tool invocations. Audit logs are essential for security monitoring.',
+        confidence: 'likely',
       });
     }
   }
@@ -286,6 +285,7 @@ function checkWildcardAccess(config: Record<string, unknown>, filePath?: string)
         description: `Configuration contains ${wp.desc.toLowerCase()} which grants broader access than typically necessary.`,
         file: filePath,
         recommendation: 'Replace wildcard permissions with specific, minimal permissions following the principle of least privilege.',
+        confidence: 'likely',
       });
     }
   }
@@ -309,6 +309,7 @@ function checkNetworkAccess(config: Record<string, unknown>, filePath?: string):
         description: 'Configuration includes external URLs but no domain allowlist/denylist is configured.',
         file: filePath,
         recommendation: 'Add domain allowlist to restrict which external services can be accessed.',
+        confidence: 'likely',
       });
     }
   }
@@ -340,6 +341,7 @@ function checkFilesystemScope(config: Record<string, unknown>, filePath?: string
           description: `${fsp.tool} capabilities detected without path restrictions, potentially allowing access to the entire filesystem.`,
           file: filePath,
           recommendation: `Configure allowedPaths or rootDir to restrict ${fsp.tool} access to necessary directories only.`,
+          confidence: 'likely',
         });
       }
     }
@@ -392,6 +394,7 @@ export function analyzeToolPermissionBoundaries(content: string, filePath?: stri
       description: 'Tools have unrestricted access with no permission boundaries. Any user could potentially invoke any tool with arbitrary arguments. No allowlist, denylist, or confirmation mechanism detected.',
       file: filePath,
       recommendation: 'Define tool permission boundaries: add allowlists for permitted tools, denylists for dangerous operations, and require confirmation for high-risk tool invocations.',
+      confidence: 'likely',
     });
   } else if (hasAllowlist && hasConfirmation) {
     // Good — has both allowlist AND confirmation for dangerous ops
@@ -411,6 +414,7 @@ export function analyzeToolPermissionBoundaries(content: string, filePath?: stri
       description: `Tool permission restrictions detected (${layers.join(', ')}) but coverage is incomplete. Consider adding ${!hasAllowlist ? 'allowlist, ' : ''}${!hasDenylist ? 'denylist, ' : ''}${!hasConfirmation ? 'confirmation for dangerous operations, ' : ''}for defense-in-depth.`.replace(/, $/, '.'),
       file: filePath,
       recommendation: 'Strengthen tool permission boundaries: combine allowlists with confirmation prompts for dangerous operations. Apply the principle of least privilege.',
+      confidence: 'likely',
     });
   }
 
@@ -523,6 +527,7 @@ export function analyzeTextPermissions(content: string, filePath?: string): Find
           file: filePath,
           line: i + 1,
           recommendation: 'Apply the principle of least privilege. Grant only the specific permissions needed for each task.',
+          confidence: 'likely',
         });
       }
     }

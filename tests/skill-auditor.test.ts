@@ -209,5 +209,15 @@ describe('Skill Auditor', () => {
       const findings = auditSkillContent(code, 'multi.ts');
       expect(findings.length).toBeGreaterThanOrEqual(3);
     });
+
+    test('all findings have confidence set', () => {
+      const code = `exec("sudo rm -rf /");`;
+      const findings = auditSkillContent(code, 'test.ts');
+      expect(findings.length).toBeGreaterThan(0);
+      for (const f of findings) {
+        expect(f.confidence).toBeDefined();
+        expect(['definite', 'likely', 'possible']).toContain(f.confidence);
+      }
+    });
   });
 });

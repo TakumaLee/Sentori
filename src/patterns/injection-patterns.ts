@@ -1469,6 +1469,64 @@ export const INJECTION_PATTERNS: AttackPattern[] = [
     severity: 'high',
     description: 'JSON Schema metadata field injection (title/summary/example)',
   },
+
+  // === JAPANESE INJECTION PATTERNS (200-207) ===
+  {
+    id: 'PI-200',
+    category: 'multilingual',
+    pattern: /以前の指示を無視して/,
+    severity: 'critical',
+    description: 'Japanese: ignore previous instructions (以前の指示を無視して)',
+  },
+  {
+    id: 'PI-201',
+    category: 'multilingual',
+    pattern: /あなたは今から/,
+    severity: 'critical',
+    description: 'Japanese: you are now (persona override) (あなたは今から)',
+  },
+  {
+    id: 'PI-202',
+    category: 'multilingual',
+    pattern: /秘密を教えて/,
+    severity: 'high',
+    description: 'Japanese: tell me the secret (秘密を教えて)',
+  },
+  {
+    id: 'PI-203',
+    category: 'multilingual',
+    pattern: /システムプロンプトを(教えて|見せて|出力して|漏らして|開示)/,
+    severity: 'critical',
+    description: 'Japanese: reveal/output system prompt (システムプロンプトを…)',
+  },
+  {
+    id: 'PI-204',
+    category: 'multilingual',
+    pattern: /制限を解除/,
+    severity: 'critical',
+    description: 'Japanese: remove/unlock restrictions (制限を解除)',
+  },
+  {
+    id: 'PI-205',
+    category: 'multilingual',
+    pattern: /指示に従わず/,
+    severity: 'critical',
+    description: 'Japanese: act without following instructions (指示に従わず)',
+  },
+  {
+    id: 'PI-206',
+    category: 'multilingual',
+    pattern: /本当の目的は/,
+    severity: 'high',
+    description: 'Japanese: your real purpose is (hidden objective framing) (本当の目的は)',
+  },
+  {
+    id: 'PI-207',
+    category: 'multilingual',
+    pattern: /管理者モード/,
+    severity: 'critical',
+    description: 'Japanese: administrator/admin mode activation (管理者モード)',
+  },
 ];
 
 export const SECRET_PATTERNS = [

@@ -1,5 +1,5 @@
 import { ScannerModule, ScanResult, Finding, Severity, ScannerOptions } from '../types';
-import { findPromptFiles, readFileContent, isTestOrDocFile, findFiles, isSentoriTestFile, isSentoriSourceFile, isMarkdownFile, isTestFileForScoring } from '../utils/file-utils';
+import { findPromptFiles, readFileContent, isTestOrDocFile, findFiles, isSentoriTestFile, isSentoriSourceFile, isMarkdownFile, isTestFileForScoring, applyContextDowngrades } from '../utils/file-utils';
 
 interface DefenseCategory {
   id: string;
@@ -288,6 +288,7 @@ export function generatePromptLeakFindings(analysis: PromptLeakAnalysis, targetP
       description: `System prompt or configuration contains sensitive data (${dataTypes}) that would be exposed if the prompt is leaked.${hasOutputFiltering ? ' Output filtering exists but may not fully prevent extraction.' : ' No output filtering detected to prevent extraction.'}${envNote}`,
       file: targetPath,
       recommendation: 'Remove sensitive data (API keys, tokens, connection strings) from prompts. Store them server-side in environment variables or secret managers, never in prompt text.',
+      confidence: 'possible',
     });
   }
 
@@ -303,6 +304,7 @@ export function generatePromptLeakFindings(analysis: PromptLeakAnalysis, targetP
       description: 'No output filtering or prompt leak prevention mechanisms detected. System prompts could be extracted through prompt injection.',
       file: targetPath,
       recommendation: 'Add output filtering to detect and block prompt leak attempts. Implement response guards that check if output contains system prompt content.',
+      confidence: 'possible',
     });
   } else if (!hasSensitiveData && hasOutputFiltering && !hasPromptProtection && !hasServerSide) {
     findings.push({
@@ -313,6 +315,7 @@ export function generatePromptLeakFindings(analysis: PromptLeakAnalysis, targetP
       description: 'Output filtering exists but no additional prompt-level or architecture-level protection layers detected. Defense-in-depth is recommended.',
       file: targetPath,
       recommendation: 'Add prompt-level instructions to refuse system prompt disclosure. Move sensitive logic server-side where possible. Use canary tokens to detect leaks.',
+      confidence: 'possible',
     });
   }
 
@@ -326,6 +329,7 @@ export function generatePromptLeakFindings(analysis: PromptLeakAnalysis, targetP
       description: `Prompt-level protection found (${analysis.promptProtectionPatterns.join(', ')}) but this is a weak defense layer that can be bypassed through prompt injection. No output filtering detected.`,
       file: targetPath,
       recommendation: 'Prompt-level instructions alone are insufficient. Add output filtering/guardrails that programmatically detect and block prompt leak attempts.',
+      confidence: 'possible',
     });
   }
 
@@ -378,6 +382,7 @@ export function generateDefenseFindings(
         description: `No evidence of ${cat.name.toLowerCase()} found in the codebase. This is a critical gap in your security posture.`,
         file: targetPath,
         recommendation: cat.recommendation,
+        confidence: 'possible',
       });
     } else if (totalWeight < cat.threshold) {
       // PARTIAL defense
@@ -389,6 +394,7 @@ export function generateDefenseFindings(
         description: `Some ${cat.name.toLowerCase()} patterns found (${matchedPatterns.join(', ')}), but coverage appears incomplete. Consider strengthening this defense.`,
         file: targetPath,
         recommendation: cat.recommendation,
+        confidence: 'possible',
       });
     }
     // else: defense is adequate, no finding
@@ -502,17 +508,10 @@ export const defenseAnalyzer: ScannerModule = {
 
     // Downgrade test/doc findings
     for (const f of defenseFindings) {
-      if (f.file && isTestOrDocFile(f.file)) {
-        if (f.severity === 'critical') f.severity = 'medium';
-        else if (f.severity === 'high') f.severity = 'info';
-        f.description += ' [test/doc file — severity reduced]';
-      }
+      if (f.file) applyContextDowngrades([f], f.file);
     }
 
     findings.push(...defenseFindings);
-
-    // Confidence: possible — inferential analysis of missing defenses
-    for (const f of findings) f.confidence = 'possible';
 
     return {
       scanner: 'Defense Analyzer',

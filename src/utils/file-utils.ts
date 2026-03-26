@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { glob } from 'glob';
 import { loadIgnorePatterns, ignoreToGlobPatterns, shouldIgnoreFile } from './ignore-parser';
+import { Finding } from '../types';
 
 export function readFileContent(filePath: string): string {
   return fs.readFileSync(filePath, 'utf-8');
@@ -79,7 +80,7 @@ const VENDORED_IGNORE = [
   '**/thirdparty/**',
   '**/external/**',
   '**/deps/**',
-  // C++ projects (typically downloaded/vendored)
+  // Matches directories ending in .cpp (e.g., llama.cpp/), not individual .cpp files
   '**/*.cpp/**',
   '**/stable-diffusion.cpp/**',
   '**/llama.cpp/**',
@@ -509,5 +510,65 @@ export function tryParseJson(content: string): unknown | null {
     return JSON.parse(content);
   } catch {
     return null;
+  }
+}
+
+export interface ContextDowngradeLabels {
+  sentoriTest?: string;
+  sentoriSource?: string;
+  markdown?: string;
+  testDoc?: string;
+}
+
+const DEFAULT_DOWNGRADE_LABELS: Required<ContextDowngradeLabels> = {
+  sentoriTest: '[security tool test file — intentional attack sample]',
+  sentoriSource: '[Sentori source file — pattern definition, not a vulnerability]',
+  markdown: '[markdown file — technical discussion, severity reduced]',
+  testDoc: '[test/doc file — severity reduced]',
+};
+
+/**
+ * Apply standard context-aware severity downgrades to findings for a given file.
+ * Centralizes the repeated test/doc and markdown downgrade patterns across scanners.
+ *
+ * Downgrade rules (applied in order, first match wins):
+ *  - Sentori test file → info + label
+ *  - Sentori source file → info + label
+ *  - Markdown file → critical→medium, high→info + label
+ *  - Test/doc file → critical→medium, high→info + label
+ *
+ * Pass custom labels to override the default messages per scanner.
+ */
+export function applyContextDowngrades(findings: Finding[], file: string, labels?: ContextDowngradeLabels): void {
+  const l = { ...DEFAULT_DOWNGRADE_LABELS, ...labels };
+
+  if (isSentoriTestFile(file)) {
+    for (const f of findings) {
+      if (f.severity !== 'info') {
+        f.severity = 'info';
+        f.description! += ` ${l.sentoriTest}`;
+      }
+    }
+  } else if (isSentoriSourceFile(file)) {
+    for (const f of findings) {
+      if (f.severity !== 'info') {
+        f.severity = 'info';
+        f.description! += ` ${l.sentoriSource}`;
+      }
+    }
+  } else if (isMarkdownFile(file)) {
+    for (const f of findings) {
+      if (f.severity === 'critical') f.severity = 'medium';
+      else if (f.severity === 'high') f.severity = 'info';
+      f.description! += ` ${l.markdown}`;
+    }
+  } else if (isTestOrDocFile(file)) {
+    for (const f of findings) {
+      if (f.severity === 'critical') f.severity = 'medium';
+      else if (f.severity === 'high') f.severity = 'info';
+      if (!f.description!.includes('[test/doc file')) {
+        f.description! += ` ${l.testDoc}`;
+      }
+    }
   }
 }

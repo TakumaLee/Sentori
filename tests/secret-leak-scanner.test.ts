@@ -167,4 +167,17 @@ describe('Secret Leak Scanner', () => {
     expect(googleKeyFinding).toBeDefined();
     expect(googleKeyFinding!.severity).toBe('info');
   });
+
+  test('all findings have confidence set', () => {
+    const findings = [
+      ...scanForSecrets('API_KEY=sk-1234567890abcdefghijklmnopqrstuv', '/app/config.ts'),
+      ...scanForSensitivePaths('read /etc/passwd', '/app/main.ts'),
+      ...scanForHardcodedCredentials('password = "hunter2"', '/app/db.ts'),
+    ];
+    expect(findings.length).toBeGreaterThan(0);
+    for (const f of findings) {
+      expect(f.confidence).toBeDefined();
+      expect(['definite', 'likely', 'possible']).toContain(f.confidence);
+    }
+  });
 });

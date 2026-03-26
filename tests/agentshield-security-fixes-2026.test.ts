@@ -193,8 +193,8 @@ describe('Sentori Security Review Fixes 2026', () => {
   // === PATTERN COUNT VERIFICATION ===
   
   describe('Pattern Count Verification', () => {
-    test('total patterns increased from 173 to 199', () => {
-      expect(INJECTION_PATTERNS.length).toBe(199);
+    test('total patterns increased from 173 to 207', () => {
+      expect(INJECTION_PATTERNS.length).toBe(207);
     });
     
     test('new patterns are in correct ranges', () => {

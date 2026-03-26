@@ -52,6 +52,14 @@ function diminishingPenalty(count: number, basePenalty: number, maxPenalty: numb
 /**
  * Interaction penalty when critical AND high findings coexist.
  * Represents compounding risk from multiple severe issue types.
+ *
+ * Uses min(critical, high) as the bottleneck factor — the penalty scales
+ * with the SMALLER of the two counts, preventing a single outlier category
+ * from dominating the score. The logarithmic curve ensures diminishing
+ * returns, and the result is capped at 10 points maximum.
+ *
+ * Examples: 3 critical + 2 high → min(3,2)=2 → 5·log₂(3) ≈ 7.9
+ *           1 critical + 5 high → min(1,5)=1 → 5·log₂(2) = 5.0
  */
 export function interactionPenalty(critical: number, high: number): number {
   if (critical > 0 && high > 0) {

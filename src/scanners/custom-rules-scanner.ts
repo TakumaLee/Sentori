@@ -27,6 +27,14 @@ const DEFAULT_IGNORE = [
 /** Max file size to scan (1 MB) */
 const MAX_FILE_BYTES = 1_048_576;
 
+/**
+ * Maximum time (ms) allowed for scanning a single file with a single rule.
+ * If exceeded, an info-level finding is emitted and the remaining lines are skipped.
+ * Note: this guards against pathological regexes across many lines; a single
+ * catastrophically-backtracking re.exec() call cannot be interrupted by JS.
+ */
+const MATCH_TIMEOUT_MS = 5_000;
+
 function isBinaryExtension(filePath: string): boolean {
   const ext = path.extname(filePath).toLowerCase();
   return ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.woff', '.woff2',
@@ -85,8 +93,13 @@ export async function runCustomRules(
         const stat = fs.statSync(filePath);
         if (stat.size > MAX_FILE_BYTES) continue;
         content = fs.readFileSync(filePath, 'utf-8');
-      } catch {
-        continue; // unreadable — skip
+      } catch (readErr) {
+        // File is unreadable (permissions, broken symlink, etc.) — skip silently.
+        // Set SENTORI_DEBUG=1 to surface these errors during development.
+        if (process.env['SENTORI_DEBUG']) {
+          process.stderr.write(`[custom-rules] skipping unreadable file ${filePath}: ${(readErr as Error).message}\n`);
+        }
+        continue;
       }
 
       const relPath = path.relative(targetDir, filePath);
@@ -97,6 +110,22 @@ export async function runCustomRules(
         re.lastIndex = 0; // reset global regex state
 
         for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+          // Guard: bail out if the overall scan has been running too long.
+          // Cannot interrupt a blocking re.exec(), but prevents runaway multi-line scans.
+          if (Date.now() - start > MATCH_TIMEOUT_MS) {
+            findings.push({
+              scanner: CUSTOM_RULES_SCANNER_NAME,
+              severity: 'info',
+              rule: rule.id,
+              title: `[Custom] Regex timeout in rule "${rule.id}"`,
+              message: `Rule "${rule.id}" exceeded ${MATCH_TIMEOUT_MS}ms scanning ${relPath} — results may be incomplete`,
+              description: `Rule "${rule.id}" exceeded ${MATCH_TIMEOUT_MS}ms scanning ${relPath} — results may be incomplete`,
+              file: relPath,
+              line: lineIdx + 1,
+            });
+            break;
+          }
+
           const line = lines[lineIdx];
           let match: RegExpExecArray | null;
           re.lastIndex = 0;

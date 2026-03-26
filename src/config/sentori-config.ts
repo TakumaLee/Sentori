@@ -83,6 +83,19 @@ export interface SentoriConfig {
 const CONFIG_FILENAMES = ['.sentori.yml', '.sentori.yaml'];
 const VALID_SEVERITIES: Severity[] = ['critical', 'high', 'medium', 'info'];
 
+/**
+ * Heuristic check for patterns that may cause catastrophic backtracking (ReDoS).
+ * Flags: nested quantifiers (a+)+ and alternation-with-quantifier (a|b)+.
+ * Not exhaustive — see docs/sentori-yml.md for guidance.
+ */
+export function hasPotentialReDoS(pattern: string): boolean {
+  // Nested quantifier: (X+)+ (X*)+ (X+)* (X?)+ etc.
+  if (/\([^)]*[+*?]\)[+*?{]/.test(pattern)) return true;
+  // Alternation with outer quantifier: (a|b)+ (a|b)* (a|b){n,}
+  if (/\([^)]*\|[^)]*\)[+*{]/.test(pattern)) return true;
+  return false;
+}
+
 function isValidSeverity(s: unknown): s is Severity {
   return typeof s === 'string' && (VALID_SEVERITIES as string[]).includes(s);
 }
@@ -136,13 +149,21 @@ export function loadSentoriConfig(targetDir: string): SentoriConfig | null {
         );
         continue;
       }
-      config.rules.push({
+      const ruleEntry: CustomRule = {
         id: String(r['id']),
         pattern: String(r['pattern']),
         severity: r['severity'],
         message: String(r['message']),
         files: r['files'] ? String(r['files']) : undefined,
-      });
+      };
+      if (hasPotentialReDoS(ruleEntry.pattern)) {
+        config.warnings.push(
+          `Rule "${ruleEntry.id}" pattern may cause catastrophic backtracking (ReDoS). ` +
+          `Avoid nested quantifiers (e.g. (a+)+) and alternations with outer quantifiers (e.g. (a|b)+). ` +
+          `See docs/sentori-yml.md for guidance.`,
+        );
+      }
+      config.rules.push(ruleEntry);
     }
   }
 

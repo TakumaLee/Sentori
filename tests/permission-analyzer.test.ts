@@ -156,4 +156,18 @@ describe('Permission Analyzer', () => {
     );
     expect(findings.length).toBeGreaterThan(0);
   });
+
+  test('all findings have confidence set', () => {
+    const config = {
+      mcpServers: { test: { command: 'node', args: ['server.js'] } },
+      tools: [{ name: 'read_file' }],
+      permissions: ['*'],
+    };
+    const findings = analyzePermissions(config, '/test/mcp.json');
+    expect(findings.length).toBeGreaterThan(0);
+    for (const f of findings) {
+      expect(f.confidence).toBeDefined();
+      expect(['definite', 'likely', 'possible']).toContain(f.confidence);
+    }
+  });
 });

@@ -160,8 +160,8 @@ export const ragPoisoningScanner: ScannerModule = {
       // not user-injected RAG documents. Findings here would be near-100% false positives.
       if (isCacheOrDataFile(file)) continue;
 
-      // Skip Sentori's own source (unless explicitly vendored/copied)
-      if (isSentoriSrc && !options?.includeVendored) continue;
+      // Skip Sentori's own source
+      if (isSentoriSrc) continue;
 
       const content = readFileContent(file);
       const lines = content.split('\n');
