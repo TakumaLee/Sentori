@@ -2,6 +2,31 @@
 
 > **Note:** This project was formerly known as **AgentShield** (npm: `aiagentshield`). Renamed to **Sentori** (`@nexylore/sentori`) starting v0.8.1.
 
+## [0.10.0] - 2026-03-27
+
+### Added
+- **MCP OAuth 2.0 Misconfiguration Scanner** — detects insecure OAuth flows in MCP server configurations
+- **GitHub MCP Toxic Agent Flow Scanner** — identifies private repo leakage via MCP tool chains (OWASP MCP06)
+- **MCP Sampling Abuse Scanner** — detects abuse of MCP sampling/completion endpoints
+- **`--discover` mode** — auto-scan common agent config paths without manual specification
+- **Japanese prompt injection patterns** (PI-200~207) — multilingual coverage for JP-targeted attacks
+- **ReDoS heuristic** for `.sentori.yml` custom rules — warns on catastrophic backtracking patterns
+- **YAML custom rules** — warnings display and documentation improvements
+
+### Changed
+- **License: MIT → BSL 1.1** — protects against competing scanning services (converts to Apache 2.0 on 2030-03-16)
+- **Scanner execution parallelized** — all scanners now run concurrently via scanner-registry
+- **Channel Surface Auditor** — rewritten with stream-based file scanning to prevent OOM on large repos
+- **A2A Security Scanner** — HTTP redirect following (max 3 hops) for agent card discovery
+- Config warnings now emitted as info-level findings visible in JSON/SARIF output
+- Confidence levels added across channel-surface, defense-analyzer, permission-analyzer, skill-auditor
+
+### Fixed
+- **Shell injection in git-utils** — replaced `execSync` with `execFileSync` to prevent injection via crafted filenames
+- `--include-vendored` flag fully threaded through all remaining scanner paths
+- `--sarifMode` + `--output` flag combination bug resolved
+- Custom Rules Scanner now has per-file timeout (5s) and `SENTORI_DEBUG` mode
+
 ## [0.9.0] - 2026-03-14
 
 ### Added
