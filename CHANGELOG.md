@@ -4,11 +4,27 @@
 
 ## [Unreleased]
 
-### Changed
+## [0.10.1] - 2026-03-28
 
+### Added
+- **`--exclude` flag** — repeatable CLI option to exclude paths (glob patterns) from scanning
+- **`.sentoriignore` support** — gitignore-like file in scan target root for persistent exclusions
+- **`isTaskLogFile()` heuristic** — Supply Chain Scanner now detects and skips agent task output logs (JSON with `task_id` + `output`/`status`/`agent`)
+- **Test coverage** for `isTaskLogFile()` and ConventionSquatting `.py`/`.ts` gating
+
+### Changed
 - **`ConventionSquattingScanner` — `nodeModulesDepth` default changed from `1` to `0`** ⚠️ **Breaking behavior change**
   node_modules directories are now skipped by default. Previously, first-level dependencies were scanned for TLD-collision packages. Users who relied on this behavior must now explicitly pass `nodeModulesDepth: 1` (programmatic API) or `--node-modules-depth 1` (CLI) to restore the old behavior.
   *Reason: default scanning of node_modules caused ~210s scan times on large repos with deep dependency trees.*
+- **ConventionSquattingScanner SQUAT-001** — only flags known convention files (`heartbeat.md`, `soul.md`, etc.), no longer fires on arbitrary `.ts`/`.py`/`.js` source files
+- **MCP Config Auditor** — schema gate skips JSON files without MCP-related keys (`mcpServers`, `tools`, etc.)
+- **Permission Analyzer / Skill Auditor** — findings in cache/data directories downgraded to `info`
+- **Defense Analyzer** — distinguishes `.env`-only sensitive data from actual system prompt exposure
+- **Visual Prompt Injection Scanner** — emits single `info` summary without `--deep-scan` (was per-image `high`)
+- **Default skip directories** expanded: `outputs/`, `output/`, `data/`, `logs/`, `dbs/`, `vault/`, `uploads/`, `runtime/`, `snapshots/`, `crawl/`, `scraped/`, `downloaded/`
+
+### Fixed
+- ~99% false positive rate when scanning AI agent workstation directories (`~/.tetora` scenario)
 
 ## [0.10.0] - 2026-03-27
 

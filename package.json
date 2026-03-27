@@ -1,6 +1,6 @@
 {
   "name": "@nexylore/sentori",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "AI Agent Security Scanner — 守るべきものを、守る。MCP-focused security for the agentic era.",
   "main": "dist/cli.js",
   "types": "dist/cli.d.ts",
