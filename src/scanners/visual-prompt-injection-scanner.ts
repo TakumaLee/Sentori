@@ -24,7 +24,7 @@ export class VisualPromptInjectionScanner implements Scanner {
     let scannedFiles = 0;
 
     // Scan code files
-    for (const file of walkFiles(targetPath, { includeVendored: options?.includeVendored })) {
+    for (const file of walkFiles(targetPath, { includeVendored: options?.includeVendored, exclude: options?.exclude, sentoriIgnorePatterns: options?.sentoriIgnorePatterns })) {
       if (this.isCodeFile(file.path)) {
         scannedFiles++;
         const codeFindings = this.scanFile(file);

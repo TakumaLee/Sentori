@@ -262,7 +262,7 @@ export class ConventionSquattingScanner implements Scanner {
 
   async scan(targetDir: string, options?: ScannerOptions): Promise<ScanResult> {
     const start = Date.now();
-    const files = walkFiles(targetDir, { includeVendored: options?.includeVendored });
+    const files = walkFiles(targetDir, { includeVendored: options?.includeVendored, exclude: options?.exclude, sentoriIgnorePatterns: options?.sentoriIgnorePatterns });
     const findings: Finding[] = [];
 
     // Scan node_modules if enabled

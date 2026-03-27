@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { shouldIgnoreFile } from './ignore-parser';
 
 export interface FileEntry {
   path: string;
@@ -21,6 +22,10 @@ export interface WalkOptions {
    * deps, etc.). Default: false (vendored dirs are skipped).
    */
   includeVendored?: boolean;
+  /** User-supplied exclude patterns (from --exclude flag). Plain names → dir glob, glob patterns used as-is. */
+  exclude?: string[];
+  /** Patterns loaded from .sentoriignore file */
+  sentoriIgnorePatterns?: string[];
 }
 
 /** Directory names considered vendored/third-party — skipped unless includeVendored is true. */
@@ -33,20 +38,30 @@ export function walkFiles(dir: string, extensionsOrOpts?: Set<string> | WalkOpti
   let exts: Set<string>;
   let maxFileSize: number;
   let includeVendored: boolean;
+  let exclude: string[];
+  let sentoriIgnorePatterns: string[];
 
   if (extensionsOrOpts instanceof Set) {
     exts = extensionsOrOpts;
     maxFileSize = DEFAULT_MAX_FILE_SIZE;
     includeVendored = false;
+    exclude = [];
+    sentoriIgnorePatterns = [];
   } else if (extensionsOrOpts) {
     exts = extensionsOrOpts.extensions ?? SCAN_EXTENSIONS;
     maxFileSize = extensionsOrOpts.maxFileSize ?? DEFAULT_MAX_FILE_SIZE;
     includeVendored = extensionsOrOpts.includeVendored ?? false;
+    exclude = extensionsOrOpts.exclude ?? [];
+    sentoriIgnorePatterns = extensionsOrOpts.sentoriIgnorePatterns ?? [];
   } else {
     exts = SCAN_EXTENSIONS;
     maxFileSize = DEFAULT_MAX_FILE_SIZE;
     includeVendored = false;
+    exclude = [];
+    sentoriIgnorePatterns = [];
   }
+
+  const allExcludePatterns = [...exclude, ...sentoriIgnorePatterns];
 
   const entries: FileEntry[] = [];
 
@@ -67,10 +82,20 @@ export function walkFiles(dir: string, extensionsOrOpts?: Set<string> | WalkOpti
         ]);
         if (skipDirs.has(item.name)) continue;
         if (!includeVendored && VENDORED_SKIP_DIRS.has(item.name)) continue;
+        // Check user-supplied exclude patterns for directories
+        if (allExcludePatterns.length > 0) {
+          const relDir = path.relative(dir, fullPath);
+          if (shouldIgnoreFile(relDir + '/x', allExcludePatterns)) continue;
+        }
         walk(fullPath);
       } else if (item.isFile()) {
         const ext = path.extname(item.name).toLowerCase();
         if (exts.has(ext) || item.name === 'SKILL.md' || item.name === 'Makefile') {
+          // Check user-supplied exclude patterns for files
+          if (allExcludePatterns.length > 0) {
+            const relFile = path.relative(dir, fullPath);
+            if (shouldIgnoreFile(relFile, allExcludePatterns)) continue;
+          }
           try {
             const stat = fs.statSync(fullPath);
             if (stat.size > maxFileSize) {

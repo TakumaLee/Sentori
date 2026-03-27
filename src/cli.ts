@@ -13,6 +13,7 @@ import { applyConfig } from './utils/apply-config';
 import { printConfigWarnings } from './utils/print-warnings';
 import { runDiscover } from './discover';
 import { CUSTOM_RULES_SCANNER_NAME } from './scanners/custom-rules-scanner';
+import { loadIgnorePatterns } from './utils/ignore-parser';
 
 // ─── Profile filtering ──────────────────────────────────────────────────────
 
@@ -80,7 +81,8 @@ function printHelp(): void {
   console.log(chalk.gray('    --profile PROFILE  Filter scanners by profile: agent (default), general, mobile'));
   console.log(chalk.gray('    --require-provenance   Exit 1 if any packages lack npm attestation'));
   console.log(chalk.gray('    --include-vendored   Include vendored/third-party code in scan'));
-  console.log(chalk.gray('    --discover         Auto-discover and scan agent configs in common paths'));
+  console.log(chalk.gray('    --exclude PATTERN    Exclude files/dirs matching pattern (can repeat)'));
+  console.log(chalk.gray('    --discover           Auto-discover and scan agent configs in common paths'));
   console.log('');
   console.log(chalk.bold('  Examples:'));
   console.log(chalk.cyan('    npx @nexylore/sentori scan'));
@@ -90,6 +92,7 @@ function printHelp(): void {
   console.log(chalk.cyan('    npx @nexylore/sentori scan ./my-agent --output report.json'));
   console.log(chalk.cyan('    npx @nexylore/sentori scan ./my-agent --output results.sarif'));
   console.log(chalk.cyan('    npx @nexylore/sentori scan ./my-agent --ioc ./custom-ioc.json'));
+  console.log(chalk.cyan('    npx @nexylore/sentori scan ./my-agent --exclude "outputs/**"'));
   console.log(chalk.cyan('    npx @nexylore/sentori --discover'));
   console.log('');
 }
@@ -131,6 +134,13 @@ async function main(): Promise<void> {
   const includeVendored = args.includes('--include-vendored');
   const requireProvenance = args.includes('--require-provenance');
 
+  const excludes: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if ((args[i] === '--exclude' || args[i] === '-e') && args[i + 1] && !args[i + 1].startsWith('-')) {
+      excludes.push(args[i + 1]);
+    }
+  }
+
   let outputPath: string | undefined;
   const outputIdx = args.findIndex((a) => a === '--output' || a === '-o');
   if (outputIdx !== -1 && args[outputIdx + 1]) {
@@ -161,6 +171,12 @@ async function main(): Promise<void> {
     const idx = args.findIndex((a) => a === flag);
     if (idx !== -1) flagValuePositions.add(idx + 1);
   }
+  // --exclude can appear multiple times
+  args.forEach((a, i) => {
+    if ((a === '--exclude' || a === '-e') && i + 1 < args.length) {
+      flagValuePositions.add(i + 1);
+    }
+  });
   let positional = args.filter(
     (a, i) => !a.startsWith('-') && !flagValuePositions.has(i)
   );
@@ -180,6 +196,9 @@ async function main(): Promise<void> {
     console.error(chalk.red(`  ✗ Target directory not found: ${targetDir}`));
     process.exit(1);
   }
+
+  // Load .sentoriignore from target directory
+  const { patterns: sentoriIgnorePatterns } = loadIgnorePatterns(targetDir);
 
   const version = getVersion();
 
@@ -225,7 +244,11 @@ async function main(): Promise<void> {
     registry.register(customRulesScanner(sentoriConfig.rules) as unknown as import('./types').Scanner);
   }
 
-  const scanOptions = { includeVendored };
+  const scanOptions = {
+    includeVendored,
+    exclude: excludes.length > 0 ? excludes : undefined,
+    sentoriIgnorePatterns: sentoriIgnorePatterns.length > 0 ? sentoriIgnorePatterns : undefined,
+  };
 
   let report = await registry.runAll(targetDir, (step, total, name, result) => {
     if (jsonMode || sarifMode) return;

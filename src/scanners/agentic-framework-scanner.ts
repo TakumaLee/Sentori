@@ -414,6 +414,8 @@ export class AgenticFrameworkScanner implements Scanner {
     const files = walkFiles(targetDir, {
       extensions,
       includeVendored: options?.includeVendored,
+      exclude: options?.exclude,
+      sentoriIgnorePatterns: options?.sentoriIgnorePatterns,
     });
 
     // Additionally walk for .env files which walkFiles might miss (no extension)

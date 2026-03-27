@@ -590,6 +590,8 @@ function collectSourceFiles(
     const entries = walkFiles(targetPath, {
       extensions: SOURCE_EXTENSIONS,
       includeVendored: options?.includeVendored ?? false,
+      exclude: options?.exclude,
+      sentoriIgnorePatterns: options?.sentoriIgnorePatterns,
     });
     return entries
       .map(e => e.path)
