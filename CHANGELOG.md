@@ -2,6 +2,14 @@
 
 > **Note:** This project was formerly known as **AgentShield** (npm: `aiagentshield`). Renamed to **Sentori** (`@nexylore/sentori`) starting v0.8.1.
 
+## [Unreleased]
+
+### Changed
+
+- **`ConventionSquattingScanner` — `nodeModulesDepth` default changed from `1` to `0`** ⚠️ **Breaking behavior change**
+  node_modules directories are now skipped by default. Previously, first-level dependencies were scanned for TLD-collision packages. Users who relied on this behavior must now explicitly pass `nodeModulesDepth: 1` (programmatic API) or `--node-modules-depth 1` (CLI) to restore the old behavior.
+  *Reason: default scanning of node_modules caused ~210s scan times on large repos with deep dependency trees.*
+
 ## [0.10.0] - 2026-03-27
 
 ### Added
