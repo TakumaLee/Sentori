@@ -529,6 +529,52 @@ function isTaskLogFile(content: string): boolean {
   }
 }
 
+/**
+ * Runtime/data paths that should not be treated as supply-chain source code.
+ * These directories contain agent outputs, session transcripts, cached data,
+ * and knowledge base content — not executable scripts or dependency manifests.
+ */
+const RUNTIME_PATH_PATTERNS = [
+  /[/\\]runtime[/\\]/i,
+  /[/\\]sessions?[/\\]/i,
+  /[/\\]browser[/\\]/i,
+  /[/\\]media[/\\]/i,
+  /[/\\]vault[/\\]/i,
+  /[/\\]outputs?[/\\]/i,
+  /[/\\]logs?[/\\]/i,
+  /[/\\]dbs?[/\\]/i,
+  /[/\\]history[/\\]/i,
+  /[/\\]snapshots?[/\\]/i,
+  /[/\\]crawl[/\\]/i,
+  /[/\\]scraped?[/\\]/i,
+  /[/\\]downloaded?[/\\]/i,
+  /[/\\]cache[/\\]/i,
+  /[/\\]caches[/\\]/i,
+  // Agent knowledge base and workspace outputs — content, not executable code
+  /[/\\]knowledge[/\\]/i,
+  /[/\\]intel[/\\]/i,
+  /[/\\]products?[/\\]/i,
+  /[/\\]content-queue[/\\]/i,
+  /[/\\]drafts?[/\\]/i,
+  /[/\\]research[/\\]/i,
+  // Build output directories
+  /[/\\]\.next[/\\]/i,
+  /[/\\]\.nuxt[/\\]/i,
+  // Agent coordination/state
+  /[/\\]coord[/\\]/i,
+  /[/\\]claims[/\\]/i,
+  /[/\\]reviews[/\\]/i,
+  /[/\\]state[/\\]/i,
+  /[/\\]shared[/\\]/i,
+  /[/\\]cron-runs[/\\]/i,
+  /[/\\]memory[/\\]/i,
+];
+
+function isRuntimeDataPath(filePath: string): boolean {
+  const normalized = filePath.replace(/\\/g, '/');
+  return RUNTIME_PATH_PATTERNS.some(p => p.test(normalized));
+}
+
 // --- Scanner class ---
 
 export class SupplyChainScanner implements Scanner {
@@ -560,6 +606,9 @@ export class SupplyChainScanner implements Scanner {
     const findings: Finding[] = [];
 
     for (const file of files) {
+      // Skip runtime/data paths — agent outputs, session transcripts, cached content
+      if (isRuntimeDataPath(file.path)) continue;
+
       // Skip task output log files (Tetora/agent schema: has task_id + output + status/agent)
       if (file.path.endsWith('.json') && isTaskLogFile(file.content)) continue;
 

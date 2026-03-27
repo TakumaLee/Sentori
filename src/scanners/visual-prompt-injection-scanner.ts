@@ -1,6 +1,7 @@
 import { Scanner, ScanResult, Finding, Severity, ScannerOptions } from '../types';
 import { walkFiles, FileEntry } from '../utils/file-walker';
 import { INJECTION_PATTERNS } from '../patterns/injection-patterns';
+import { shouldIgnoreFile } from '../utils/ignore-parser';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -33,7 +34,7 @@ export class VisualPromptInjectionScanner implements Scanner {
     }
 
     // Scan image files only in deep-scan mode (OCR is slow)
-    const imageFiles = this.findImageFiles(targetPath);
+    const imageFiles = this.findImageFiles(targetPath, options?.exclude, options?.sentoriIgnorePatterns);
     if (!process.env.SENTORI_DEEP_SCAN) {
       // Without OCR, emit one INFO summary instead of per-image findings
       if (imageFiles.length > 0) {
@@ -72,34 +73,49 @@ export class VisualPromptInjectionScanner implements Scanner {
   }
 
   /**
-   * Find all image files in directory
+   * Find all image files in directory, respecting exclude and sentoriIgnore patterns.
    */
-  private findImageFiles(dir: string): string[] {
+  private findImageFiles(dir: string, exclude?: string[], sentoriIgnorePatterns?: string[]): string[] {
     const imageFiles: string[] = [];
+    const allExcludePatterns = [...(exclude ?? []), ...(sentoriIgnorePatterns ?? [])];
 
-    function walk(currentDir: string): void {
+    const skipDirs = new Set([
+      'node_modules', '.git', 'dist', 'build', 'coverage', '.next',
+      'browser', 'Extensions', '.cache', 'Cache', 'CacheStorage',
+      'GPUCache', 'ShaderCache', 'GrShaderCache', '__pycache__',
+      '.venv', 'venv', '.tox', '.mypy_cache',
+      'models', 'checkpoints', 'weights', 'sd-setup',
+      // Runtime data directories (sync with file-walker.ts skipDirs)
+      'outputs', 'output', 'data', 'logs', 'dbs',
+      'vault', 'uploads', 'history', 'runtime',
+      // Agent workstation runtime directories
+      'sessions', 'cache', 'media', 'user-data',
+      'snapshots', 'crawl', 'scraped', 'downloaded',
+      'cron-runs',
+    ]);
+
+    const walk = (currentDir: string): void => {
       if (!fs.existsSync(currentDir)) return;
       try {
         const items = fs.readdirSync(currentDir, { withFileTypes: true });
         for (const item of items) {
           const fullPath = path.join(currentDir, item.name);
           if (item.isDirectory()) {
-            const skipDirs = new Set([
-              'node_modules', '.git', 'dist', 'build', 'coverage',
-              'browser', 'Extensions', '.cache', 'Cache', 'CacheStorage',
-              'GPUCache', 'ShaderCache', 'GrShaderCache', '__pycache__',
-              '.venv', 'venv', '.tox', '.mypy_cache',
-              'models', 'checkpoints', 'weights', 'sd-setup',
-              // Runtime data directories (sync with file-walker.ts skipDirs)
-              'outputs', 'output', 'data', 'logs', 'dbs',
-              'vault', 'uploads', 'history', 'runtime',
-              'snapshots', 'crawl', 'scraped', 'downloaded',
-            ]);
             if (skipDirs.has(item.name)) continue;
+            // Check user-supplied exclude patterns for directories
+            if (allExcludePatterns.length > 0) {
+              const relDir = path.relative(dir, fullPath);
+              if (shouldIgnoreFile(relDir + '/x', allExcludePatterns)) continue;
+            }
             walk(fullPath);
           } else if (item.isFile()) {
             const ext = path.extname(item.name).toLowerCase();
             if (['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'].includes(ext)) {
+              // Check user-supplied exclude patterns for files
+              if (allExcludePatterns.length > 0) {
+                const relFile = path.relative(dir, fullPath);
+                if (shouldIgnoreFile(relFile, allExcludePatterns)) continue;
+              }
               imageFiles.push(fullPath);
             }
           }
@@ -107,7 +123,7 @@ export class VisualPromptInjectionScanner implements Scanner {
       } catch {
         // skip unreadable directories
       }
-    }
+    };
 
     walk(dir);
     return imageFiles;

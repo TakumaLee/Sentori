@@ -115,12 +115,19 @@ export interface FilePermissionIssue {
   issue: string;
 }
 
+/** Directory segments that indicate workspace/managed content, not deployable config. */
+const WORKSPACE_CONTENT_DIRS = /[/\\](?:workspace|shared|coord|claims|reviews|state|team|projects|research|knowledge|intel|products|content-queue|drafts|skills|memory|workflows|cron-runs)[/\\]/i;
+
 function isSensitiveConfigFile(filePath: string): boolean {
   const basename = path.basename(filePath).toLowerCase();
   const ext = path.extname(filePath).toLowerCase();
 
   // Handle dotfiles like .env, .env.local, .env.production
   if (basename === '.env' || basename.startsWith('.env.')) return true;
+
+  // Skip workspace/managed content directories — these contain agent data
+  // that naturally includes words like "token", "key" in non-secret contexts.
+  if (WORKSPACE_CONTENT_DIRS.test(filePath)) return false;
 
   return SENSITIVE_CONFIG_EXTENSIONS.includes(ext);
 }
@@ -383,12 +390,30 @@ export const environmentIsolationAuditor: ScannerModule = {
     const start = Date.now();
     const findings: Finding[] = [];
 
-    // Gather all files
+    // Gather only config/env/container files — the auditor does not need to walk
+    // every file in the tree. It checks file permissions on config files, and
+    // reads docker-compose / Dockerfile for network/resource/volume settings.
     let allFiles: string[] = [];
     try {
       allFiles = await findFiles(
         targetPath,
-        ['**/*'],
+        [
+          '**/*.json',
+          '**/*.yaml',
+          '**/*.yml',
+          '**/*.toml',
+          '**/*.conf',
+          '**/*.cfg',
+          '**/*.ini',
+          '**/*.env',
+          '**/.env*',
+          '**/*.pem',
+          '**/*.key',
+          '**/Dockerfile',
+          '**/Dockerfile.*',
+          '**/docker-compose.yml',
+          '**/docker-compose.yaml',
+        ],
         options?.exclude,
         options?.includeVendored,
         options?.sentoriIgnorePatterns,

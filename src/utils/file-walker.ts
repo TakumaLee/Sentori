@@ -73,7 +73,7 @@ export function walkFiles(dir: string, extensionsOrOpts?: Set<string> | WalkOpti
       if (item.isDirectory()) {
         // Skip common large/irrelevant directories
         const skipDirs = new Set([
-          'node_modules', '.git', 'dist', 'build', 'coverage',
+          'node_modules', '.git', 'dist', 'build', 'coverage', '.next',
           'browser', 'Extensions', '.cache', 'Cache', 'CacheStorage',
           'GPUCache', 'ShaderCache', 'GrShaderCache', '__pycache__',
           '.venv', 'venv', '.tox', '.mypy_cache',
@@ -83,6 +83,7 @@ export function walkFiles(dir: string, extensionsOrOpts?: Set<string> | WalkOpti
           'outputs', 'output', 'data', 'logs', 'dbs',
           'vault', 'uploads', 'history', 'runtime',
           'snapshots', 'crawl', 'scraped', 'downloaded',
+          'sessions', 'cron-runs', 'media',  // Agent runtime
         ]);
         if (skipDirs.has(item.name)) continue;
         if (!includeVendored && VENDORED_SKIP_DIRS.has(item.name)) continue;
