@@ -120,6 +120,33 @@ describe('ConventionSquattingScanner', () => {
       }
     });
 
+    test('does NOT flag arbitrary .py files (not known convention files)', async () => {
+      // Python source files have a TLD-colliding extension (.py) but are not convention
+      // squatting targets — only known convention filenames (heartbeat.md, readme.md, etc.)
+      // should be flagged to avoid false positives in workstation/codebase scans.
+      const dir = createTempDir({ 'utils.py': 'def hello(): pass', 'mymodule.py': 'x = 1' });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SQUAT-001');
+        expect(matches.length).toBe(0);
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('does NOT flag arbitrary .ts files (not known convention files)', async () => {
+      // TypeScript source files have a TLD-colliding extension (.ts) but are not convention
+      // squatting targets.
+      const dir = createTempDir({ 'index.ts': 'export const x = 1;', 'service.ts': 'class S {}' });
+      try {
+        const result = await scanner.scan(dir);
+        const matches = result.findings.filter((f) => f.rule === 'SQUAT-001');
+        expect(matches.length).toBe(0);
+      } finally {
+        cleanup(dir);
+      }
+    });
+
     test('does not flag .txt or .yaml files', async () => {
       const dir = createTempDir({ 'notes.txt': 'hello', 'config.yaml': 'key: val' });
       try {
