@@ -94,25 +94,27 @@ describe('ConventionSquattingScanner', () => {
       }
     });
 
-    test('flags unknown .md files with LOW severity', async () => {
+    test('does NOT flag unknown .md files (not in KNOWN_CONVENTION_FILES)', async () => {
+      // Arbitrary .md files that are not known convention files are skipped to reduce
+      // false positives when scanning large codebases or workstation directories.
       const dir = createTempDir({ 'CUSTOM.md': '# Custom' });
       try {
         const result = await scanner.scan(dir);
         const matches = result.findings.filter((f) => f.rule === 'SQUAT-001');
-        expect(matches.length).toBe(1);
-        expect(matches[0].severity).toBe('info');
+        expect(matches.length).toBe(0);
       } finally {
         cleanup(dir);
       }
     });
 
-    test('flags .sh files as TLD collisions', async () => {
+    test('does NOT flag arbitrary .sh files (not known convention files)', async () => {
+      // Arbitrary shell scripts that happen to have a TLD-colliding extension (.sh)
+      // are skipped — only known convention filenames are flagged.
       const dir = createTempDir({ 'setup.sh': '#!/bin/bash\necho hi' });
       try {
         const result = await scanner.scan(dir);
         const matches = result.findings.filter((f) => f.rule === 'SQUAT-001');
-        expect(matches.length).toBe(1);
-        expect(matches[0].message).toContain('.sh');
+        expect(matches.length).toBe(0);
       } finally {
         cleanup(dir);
       }
@@ -282,8 +284,9 @@ describe('ConventionSquattingScanner', () => {
         const result = await scanner.scan(dir);
         // Should have TLD collision findings for all .md files
         const squat001 = result.findings.filter((f) => f.rule === 'SQUAT-001');
-        // 5 .md files + 1 .js file = 6 TLD collisions
-        expect(squat001.length).toBe(6);
+        // Only known convention files: AGENTS.md, SOUL.md, MEMORY.md, HEARTBEAT.md, TOOLS.md
+        // src/loader.js is NOT a known convention file, so it's skipped (no false positives)
+        expect(squat001.length).toBe(5);
         // Should have URL resolution finding
         const squat002 = result.findings.filter((f) => f.rule === 'SQUAT-002');
         expect(squat002.length).toBe(1);

@@ -38,7 +38,16 @@ export const mcpConfigAuditor: ScannerModule = {
         }
 
         if (parsed && typeof parsed === 'object') {
-          const fileFindings = auditConfig(parsed as Record<string, unknown>, file);
+          // Schema gate: skip files that don't look like MCP config at all
+          // (no mcpServers/mcp_servers/servers, no tools array, no server/command/env keys)
+          const obj = parsed as Record<string, unknown>;
+          const hasMcpKeys = obj.mcpServers || obj.mcp_servers || obj.servers;
+          const hasToolsArray = Array.isArray(obj.tools);
+          const hasConfigKeys = ['server', 'command', 'env', 'endpoint', 'host', 'port']
+            .some(k => Object.keys(obj).some(ok => ok.toLowerCase().includes(k)));
+          if (!hasMcpKeys && !hasToolsArray && !hasConfigKeys) continue;
+
+          const fileFindings = auditConfig(obj, file);
           // Downgrade findings from cache/data directories to info
           if (isCacheOrDataFile(file)) {
             for (const f of fileFindings) {

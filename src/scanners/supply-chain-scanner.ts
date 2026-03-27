@@ -510,6 +510,25 @@ const setupPyRule: Rule = {
   },
 };
 
+// --- Task log detection ---
+
+/**
+ * Detect agent task output log files (e.g. Tetora task logs).
+ * Schema: root-level object with task_id + (output | status | agent | role).
+ * These are runtime data, not source code — skip scanning.
+ */
+function isTaskLogFile(content: string): boolean {
+  try {
+    const obj = JSON.parse(content);
+    if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) return false;
+    const keys = Object.keys(obj);
+    if (!keys.includes('task_id')) return false;
+    return keys.includes('output') || keys.includes('status') || keys.includes('agent') || keys.includes('role');
+  } catch {
+    return false;
+  }
+}
+
 // --- Scanner class ---
 
 export class SupplyChainScanner implements Scanner {
@@ -541,6 +560,9 @@ export class SupplyChainScanner implements Scanner {
     const findings: Finding[] = [];
 
     for (const file of files) {
+      // Skip task output log files (Tetora/agent schema: has task_id + output + status/agent)
+      if (file.path.endsWith('.json') && isTaskLogFile(file.content)) continue;
+
       for (const rule of this.rules) {
         findings.push(...rule.check(file));
       }

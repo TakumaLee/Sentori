@@ -1,3 +1,4 @@
+import * as path from 'path';
 import { ScannerModule, ScanResult, Finding, Severity, ScanContext, ScannerOptions } from '../types';
 import { findFiles, readFileContent, isTestOrDocFile, isFrameworkInfraFile, isUserInputFile, isSkillPluginFile, isSentoriTestFile, isSentoriSourceFile, isSecurityToolFile, isMarkdownFile, isTestFileForScoring, applyContextDowngrades } from '../utils/file-utils';
 
@@ -286,6 +287,22 @@ export function applyFrameworkDowngrades(findings: Finding[], filePath: string):
   }
 }
 
+/**
+ * Detect API client files where env+network patterns (SA-001) are expected.
+ * Heuristic: path or filename contains api/client/provider/sdk/service keywords,
+ * or content contains common API client patterns.
+ */
+function isApiClientFile(filePath: string, content: string): boolean {
+  const normalized = filePath.replace(/\\/g, '/').toLowerCase();
+  const basename = path.basename(normalized);
+  const pathKeywords = ['api', 'client', 'provider', 'sdk', 'service'];
+  const basenameKeywords = ['client', 'api', 'provider', 'auth'];
+  if (pathKeywords.some(k => normalized.includes('/' + k + '/') || normalized.includes('/' + k + '.'))) return true;
+  if (basenameKeywords.some(k => basename.includes(k))) return true;
+  if (/\b(?:baseURL|Authorization:|Bearer |apiKey|api_key)\b/.test(content)) return true;
+  return false;
+}
+
 export const skillAuditor: ScannerModule = {
   name: 'Skill Auditor',
   description: 'Scans third-party skills, plugins, and tools for suspicious behavior including data exfiltration, shell injection, and privilege escalation',
@@ -333,6 +350,16 @@ export const skillAuditor: ScannerModule = {
             if (f.id!.startsWith('SA-002-') && f.title === 'Reading sensitive file' && f.severity !== 'info') {
               f.severity = 'info';
               f.description += ' [security tool file — reading credential paths for detection is expected behavior]';
+            }
+          }
+        }
+
+        // API client files: SA-001 env+network patterns are expected behavior
+        if (isApiClientFile(file, content)) {
+          for (const f of fileFindings) {
+            if (f.id!.startsWith('SA-001') && f.severity !== 'info') {
+              f.severity = 'info';
+              f.description += ' [API client file — authorization headers are expected behavior]';
             }
           }
         }

@@ -79,6 +79,10 @@ export function walkFiles(dir: string, extensionsOrOpts?: Set<string> | WalkOpti
           '.venv', 'venv', '.tox', '.mypy_cache',
           'models', 'checkpoints', 'weights',  // ML model dirs
           'sd-setup',  // Stable Diffusion
+          // Runtime data directories (sync with DEFAULT_IGNORE in file-utils.ts)
+          'outputs', 'output', 'data', 'logs', 'dbs',
+          'vault', 'uploads', 'history', 'runtime',
+          'snapshots', 'crawl', 'scraped', 'downloaded',
         ]);
         if (skipDirs.has(item.name)) continue;
         if (!includeVendored && VENDORED_SKIP_DIRS.has(item.name)) continue;

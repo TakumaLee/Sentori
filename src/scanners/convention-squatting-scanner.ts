@@ -296,6 +296,10 @@ export class ConventionSquattingScanner implements Scanner {
     }
 
     // Rule 1: Convention Filename TLD Collision
+    // Only flag files that match known convention filenames (heartbeat or known agent convention
+    // files). Arbitrary source files (.ts, .js, .py, etc.) that happen to have TLD-colliding
+    // extensions are NOT convention squatting targets — they generate too many false positives
+    // when scanning large codebases or workstation directories like ~/.tetora.
     for (const file of files) {
       const basename = path.basename(file.relativePath);
       if (isTLDCollision(basename)) {
@@ -303,7 +307,10 @@ export class ConventionSquattingScanner implements Scanner {
         const isKnown = KNOWN_CONVENTION_FILES.includes(domain);
         const isHeartbeat = HEARTBEAT_FILENAMES.has(domain);
 
-        let severity: Severity = isHeartbeat ? 'high' : isKnown ? 'medium' : 'info';
+        // Skip arbitrary files that aren't known convention files
+        if (!isKnown && !isHeartbeat) continue;
+
+        let severity: Severity = isHeartbeat ? 'high' : 'medium';
         const rec = isHeartbeat
           ? 'CRITICAL: This file is read periodically — a squatted domain would enable persistent injection. Use absolute local paths and validate file source is local filesystem, not network.'
           : 'Filename resolves as a valid domain. Ensure agent reads via local fs path, not URL resolution. Add integrity checks (hash verification) for convention files.';

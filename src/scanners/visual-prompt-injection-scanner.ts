@@ -33,7 +33,21 @@ export class VisualPromptInjectionScanner implements Scanner {
     }
 
     // Scan image files only in deep-scan mode (OCR is slow)
+    const imageFiles = this.findImageFiles(targetPath);
     if (!process.env.SENTORI_DEEP_SCAN) {
+      // Without OCR, emit one INFO summary instead of per-image findings
+      if (imageFiles.length > 0) {
+        findings.push({
+          id: 'VPI-IMG-SUMMARY',
+          scanner: 'visual-prompt-injection-scanner',
+          severity: 'info',
+          title: `${imageFiles.length} image file(s) found — OCR not enabled`,
+          description: `Found ${imageFiles.length} image file(s) that may contain embedded prompt injection. Enable --deep-scan to perform OCR analysis.`,
+          file: targetPath,
+          confidence: 'possible',
+          recommendation: 'Run with --deep-scan to enable OCR-based visual prompt injection detection.',
+        });
+      }
       return {
         scanner: this.name,
         findings,
@@ -42,7 +56,7 @@ export class VisualPromptInjectionScanner implements Scanner {
       };
     }
 
-    const imageFiles = this.findImageFiles(targetPath);
+
     for (const imagePath of imageFiles) {
       scannedFiles++;
       const imageFindings = await this.scanImageFile({ path: imagePath, relativePath: path.relative(targetPath, imagePath), content: '' });
@@ -76,6 +90,10 @@ export class VisualPromptInjectionScanner implements Scanner {
               'GPUCache', 'ShaderCache', 'GrShaderCache', '__pycache__',
               '.venv', 'venv', '.tox', '.mypy_cache',
               'models', 'checkpoints', 'weights', 'sd-setup',
+              // Runtime data directories (sync with file-walker.ts skipDirs)
+              'outputs', 'output', 'data', 'logs', 'dbs',
+              'vault', 'uploads', 'history', 'runtime',
+              'snapshots', 'crawl', 'scraped', 'downloaded',
             ]);
             if (skipDirs.has(item.name)) continue;
             walk(fullPath);
