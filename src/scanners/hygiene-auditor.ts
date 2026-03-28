@@ -73,8 +73,8 @@ interface CheckContext {
 // --- Credential patterns ---
 
 const CREDENTIAL_PATTERNS: Array<{ pattern: RegExp; name: string }> = [
-  { pattern: /sk-[a-zA-Z0-9]{20,}/g, name: 'OpenAI API key' },
-  { pattern: /sk-ant-[a-zA-Z0-9\-_]{20,}/g, name: 'Anthropic API key' },
+  { pattern: /(?<![a-zA-Z])sk-[a-zA-Z0-9]{20,}/g, name: 'OpenAI API key' },
+  { pattern: /(?<![a-zA-Z])sk-ant-[a-zA-Z0-9\-_]{20,}/g, name: 'Anthropic API key' },
   { pattern: /AKIA[0-9A-Z]{16}/g, name: 'AWS Access Key ID' },
   { pattern: /ghp_[a-zA-Z0-9]{36,}/g, name: 'GitHub personal access token' },
   { pattern: /gho_[a-zA-Z0-9]{36,}/g, name: 'GitHub OAuth token' },
@@ -83,7 +83,7 @@ const CREDENTIAL_PATTERNS: Array<{ pattern: RegExp; name: string }> = [
   { pattern: /sk_test_[a-zA-Z0-9]{24,}/g, name: 'Stripe test key' },
   { pattern: /xoxb-[0-9]{10,}-[a-zA-Z0-9]{20,}/g, name: 'Slack bot token' },
   { pattern: /xoxp-[0-9]{10,}-[a-zA-Z0-9]{20,}/g, name: 'Slack user token' },
-  { pattern: /(?:^|[^a-zA-Z0-9])([a-zA-Z0-9_\-]{2,}(?:_?(?:API|SECRET|TOKEN|KEY|PASSWORD|PASSWD|PWD))\s*[:=]\s*['"]?[a-zA-Z0-9\-_./+]{8,})['"]?/gim, name: 'Generic secret assignment' },
+  { pattern: /(?:^|[^a-zA-Z0-9])((?:API|SECRET|AUTH|ACCESS|PRIVATE|SIGNING|ENCRYPTION|DATABASE|DB|REDIS|MONGO|SMTP|MAIL|AWS|AZURE|GCP|CLOUD|SERVICE|CLIENT|WEBHOOK|HF)[-_]?(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|PWD|CREDENTIAL)\s*[:=]\s*['"]?[a-zA-Z0-9\-_./+]{8,})['"]?/gim, name: 'Generic secret assignment' },
 ];
 
 // --- Work app indicators ---
@@ -241,13 +241,44 @@ function checkShellAccess(ctx: CheckContext): HygieneFinding {
   };
 }
 
+/** Placeholder patterns that should NOT trigger credential alerts */
+const PLACEHOLDER_RE = /^(?:<[^>]+>|your[_-]|xxx|placeholder|example|changeme|replace[_-]?me|TODO|FIXME|DEMO|\$\{|%s|hf_your)/i;
+
+/** Patterns that indicate env var reading (not hardcoded secrets) */
+const ENV_VAR_READ_RE = /(?:os\.environ|os\.getenv|process\.env|getenv\(|ENV\[|env\.|System\.getenv|\$\{?\w+_(?:KEY|TOKEN|SECRET))/;
+
+/** File extensions that are documentation, not executable code */
+const DOC_EXTS_CRED = new Set(['.md', '.txt', '.rst', '.adoc', '.example']);
+
 function checkCredentialExposure(ctx: CheckContext): HygieneFinding {
   const exposures: string[] = [];
 
   for (const file of ctx.fileContents) {
+    const ext = file.relativePath.replace(/.*\./, '.').toLowerCase();
+    const isDoc = DOC_EXTS_CRED.has(ext) || file.relativePath.endsWith('.example');
+
     for (const { pattern, name } of CREDENTIAL_PATTERNS) {
       const regex = new RegExp(pattern.source, pattern.flags);
-      if (regex.test(file.content)) {
+      let match: RegExpExecArray | null;
+      let found = false;
+      while ((match = regex.exec(file.content)) !== null) {
+        const value = match[0];
+        const secretPart = value.replace(/^[^=:]+[=:]\s*['"]?/, '');
+        // Skip obvious placeholder values
+        if (PLACEHOLDER_RE.test(secretPart)) continue;
+        // Skip env var reading patterns (os.environ.get, process.env, etc.)
+        // — these read from env at runtime, not hardcoded secrets
+        const lineStart = file.content.lastIndexOf('\n', match.index) + 1;
+        const line = file.content.substring(lineStart, file.content.indexOf('\n', match.index + 1));
+        if (ENV_VAR_READ_RE.test(line)) continue;
+        // In documentation files, skip placeholder-like values
+        if (isDoc) {
+          if (/^[x]{4,}$/i.test(secretPart) || /xxx/i.test(secretPart)) continue;
+        }
+        found = true;
+        break;
+      }
+      if (found) {
         exposures.push(`${name} in ${file.relativePath}`);
       }
     }
