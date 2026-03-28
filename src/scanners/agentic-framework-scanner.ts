@@ -416,6 +416,7 @@ export class AgenticFrameworkScanner implements Scanner {
       includeVendored: options?.includeVendored,
       exclude: options?.exclude,
       sentoriIgnorePatterns: options?.sentoriIgnorePatterns,
+      includeWorkspaceProjects: options?.includeWorkspaceProjects,
     });
 
     // Additionally walk for .env files which walkFiles might miss (no extension)

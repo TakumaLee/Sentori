@@ -100,7 +100,8 @@ export const ragPoisoningScanner: ScannerModule = {
       patterns,
       options?.exclude,
       options?.includeVendored,
-      options?.sentoriIgnorePatterns
+      options?.sentoriIgnorePatterns,
+      options?.includeWorkspaceProjects
     );
 
     // Prompt injection patterns (CRITICAL severity)

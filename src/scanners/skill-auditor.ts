@@ -317,7 +317,7 @@ export const skillAuditor: ScannerModule = {
       '**/*.ts',
       '**/*.py',
       '**/*.sh',
-    ], options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns);
+    ], options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns, options?.includeWorkspaceProjects);
 
     for (const file of files) {
       try {

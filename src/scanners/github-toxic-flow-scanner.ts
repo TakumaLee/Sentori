@@ -592,6 +592,7 @@ function collectSourceFiles(
       includeVendored: options?.includeVendored ?? false,
       exclude: options?.exclude,
       sentoriIgnorePatterns: options?.sentoriIgnorePatterns,
+      includeWorkspaceProjects: options?.includeWorkspaceProjects,
     });
     return entries
       .map(e => e.path)

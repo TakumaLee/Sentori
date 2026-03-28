@@ -173,7 +173,7 @@ export class LangChainSerializationScanner implements Scanner {
     let scannedFiles = 0;
 
     const extensions = new Set(['.py', '.ts', '.js', '.jsx', '.tsx']);
-    const files = walkFiles(targetDir, { extensions, includeVendored: options?.includeVendored, exclude: options?.exclude, sentoriIgnorePatterns: options?.sentoriIgnorePatterns });
+    const files = walkFiles(targetDir, { extensions, includeVendored: options?.includeVendored, exclude: options?.exclude, sentoriIgnorePatterns: options?.sentoriIgnorePatterns, includeWorkspaceProjects: options?.includeWorkspaceProjects });
 
     for (const file of files) {
       scannedFiles++;

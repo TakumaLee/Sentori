@@ -26,6 +26,35 @@ export interface WalkOptions {
   exclude?: string[];
   /** Patterns loaded from .sentoriignore file */
   sentoriIgnorePatterns?: string[];
+  /** When true, scan sub-projects inside workspace/ directories. Default: false. */
+  includeWorkspaceProjects?: boolean;
+}
+
+/** Files that indicate a directory is a project root. */
+const PROJECT_MARKERS = [
+  'package.json', 'go.mod', 'Cargo.toml', 'pyproject.toml',
+  'setup.py', 'requirements.txt', 'pubspec.yaml', 'Gemfile',
+  'pom.xml', 'build.gradle', 'build.gradle.kts', 'Makefile',
+  'CMakeLists.txt', 'composer.json', 'mix.exs',
+];
+
+/** Known workspace directory names used by AI agent systems. */
+const WORKSPACE_DIRS = new Set([
+  'workspace', 'workspaces',
+]);
+
+/**
+ * Check if a directory looks like a sub-project root
+ * (has .git or a build system manifest).
+ */
+function isProjectRoot(dirPath: string): boolean {
+  try {
+    const items = fs.readdirSync(dirPath);
+    if (items.includes('.git')) return true;
+    return PROJECT_MARKERS.some(m => items.includes(m));
+  } catch {
+    return false;
+  }
 }
 
 /** Directory names considered vendored/third-party — skipped unless includeVendored is true. */
@@ -38,6 +67,7 @@ export function walkFiles(dir: string, extensionsOrOpts?: Set<string> | WalkOpti
   let exts: Set<string>;
   let maxFileSize: number;
   let includeVendored: boolean;
+  let includeWorkspaceProjects: boolean;
   let exclude: string[];
   let sentoriIgnorePatterns: string[];
 
@@ -45,18 +75,21 @@ export function walkFiles(dir: string, extensionsOrOpts?: Set<string> | WalkOpti
     exts = extensionsOrOpts;
     maxFileSize = DEFAULT_MAX_FILE_SIZE;
     includeVendored = false;
+    includeWorkspaceProjects = false;
     exclude = [];
     sentoriIgnorePatterns = [];
   } else if (extensionsOrOpts) {
     exts = extensionsOrOpts.extensions ?? SCAN_EXTENSIONS;
     maxFileSize = extensionsOrOpts.maxFileSize ?? DEFAULT_MAX_FILE_SIZE;
     includeVendored = extensionsOrOpts.includeVendored ?? false;
+    includeWorkspaceProjects = extensionsOrOpts.includeWorkspaceProjects ?? false;
     exclude = extensionsOrOpts.exclude ?? [];
     sentoriIgnorePatterns = extensionsOrOpts.sentoriIgnorePatterns ?? [];
   } else {
     exts = SCAN_EXTENSIONS;
     maxFileSize = DEFAULT_MAX_FILE_SIZE;
     includeVendored = false;
+    includeWorkspaceProjects = false;
     exclude = [];
     sentoriIgnorePatterns = [];
   }
@@ -87,6 +120,10 @@ export function walkFiles(dir: string, extensionsOrOpts?: Set<string> | WalkOpti
         ]);
         if (skipDirs.has(item.name)) continue;
         if (!includeVendored && VENDORED_SKIP_DIRS.has(item.name)) continue;
+        // Skip sub-projects inside workspace/ directories (default: off)
+        if (!includeWorkspaceProjects && WORKSPACE_DIRS.has(path.basename(currentDir))) {
+          if (isProjectRoot(fullPath)) continue;
+        }
         // Check user-supplied exclude patterns for directories
         if (allExcludePatterns.length > 0) {
           const relDir = path.relative(dir, fullPath);

@@ -261,7 +261,7 @@ export function resetIgnoredFileCount(): void {
   _ignoredByAgentshieldIgnore = 0;
 }
 
-export async function findFiles(targetPath: string, patterns: string[], excludePatterns?: string[], includeVendored?: boolean, sentoriIgnorePatterns?: string[]): Promise<string[]> {
+export async function findFiles(targetPath: string, patterns: string[], excludePatterns?: string[], includeVendored?: boolean, sentoriIgnorePatterns?: string[], includeWorkspaceProjects?: boolean): Promise<string[]> {
   const results: string[] = [];
   const absTarget = path.resolve(targetPath);
   const ignoreList = buildIgnoreList(excludePatterns, includeVendored);
@@ -270,6 +270,32 @@ export async function findFiles(targetPath: string, patterns: string[], excludeP
   if (sentoriIgnorePatterns && sentoriIgnorePatterns.length > 0) {
     const globPatterns = ignoreToGlobPatterns(sentoriIgnorePatterns);
     ignoreList.push(...globPatterns);
+  }
+
+  // Skip sub-projects inside workspace/ directories (default: off)
+  if (!includeWorkspaceProjects) {
+    for (const wsName of ['workspace', 'workspaces']) {
+      const wsDir = path.join(absTarget, wsName);
+      if (fs.existsSync(wsDir) && fs.statSync(wsDir).isDirectory()) {
+        try {
+          const entries = fs.readdirSync(wsDir, { withFileTypes: true });
+          for (const entry of entries) {
+            if (!entry.isDirectory()) continue;
+            const subDir = path.join(wsDir, entry.name);
+            const items = fs.readdirSync(subDir).map(i => i);
+            const hasProjectMarker = items.includes('.git') || [
+              'package.json', 'go.mod', 'Cargo.toml', 'pyproject.toml',
+              'setup.py', 'requirements.txt', 'pubspec.yaml', 'Gemfile',
+              'pom.xml', 'build.gradle', 'build.gradle.kts',
+              'CMakeLists.txt', 'composer.json', 'mix.exs',
+            ].some(m => items.includes(m));
+            if (hasProjectMarker) {
+              ignoreList.push(`${wsName}/${entry.name}/**`);
+            }
+          }
+        } catch { /* skip unreadable */ }
+      }
+    }
   }
 
   for (const pattern of patterns) {

@@ -20,7 +20,7 @@ export const dnsIcmpToolScanner: ScannerModule = {
 
     // Scan TypeScript, JavaScript, Python files
     const patterns = ['**/*.ts', '**/*.js', '**/*.tsx', '**/*.jsx', '**/*.py'];
-    const files = await findFiles(targetPath, patterns, options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns);
+    const files = await findFiles(targetPath, patterns, options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns, options?.includeWorkspaceProjects);
 
     const DNS_ICMP_TOOLS = ['ping', 'nslookup', 'dig', 'host', 'traceroute', 'tracert'];
     

@@ -82,6 +82,8 @@ export interface ScannerOptions {
   includeVendored?: boolean;
   /** Additional glob patterns from .sentoriignore */
   sentoriIgnorePatterns?: string[];
+  /** When true, scan sub-projects inside workspace/ directories. Default: false. */
+  includeWorkspaceProjects?: boolean;
 }
 
 export interface ScannerModule {

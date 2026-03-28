@@ -26,7 +26,7 @@ export const clipboardExfiltrationScanner: ScannerModule = {
 
     // Scan TypeScript, JavaScript, Python, Shell files
     const patterns = ['**/*.ts', '**/*.js', '**/*.tsx', '**/*.jsx', '**/*.py', '**/*.sh', '**/*.bash'];
-    const files = await findFiles(targetPath, patterns, options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns);
+    const files = await findFiles(targetPath, patterns, options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns, options?.includeWorkspaceProjects);
 
     // Clipboard read patterns
     const CLIPBOARD_READ_PATTERNS = {

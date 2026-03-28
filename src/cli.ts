@@ -82,6 +82,7 @@ function printHelp(): void {
   console.log(chalk.gray('    --require-provenance   Exit 1 if any packages lack npm attestation'));
   console.log(chalk.gray('    --include-vendored   Include vendored/third-party code in scan'));
   console.log(chalk.gray('    --exclude PATTERN    Exclude files/dirs matching pattern (can repeat)'));
+  console.log(chalk.gray('    --include-workspace-projects  Scan sub-projects inside workspace/ (default: skip)'));
   console.log(chalk.gray('    --discover           Auto-discover and scan agent configs in common paths'));
   console.log('');
   console.log(chalk.bold('  Examples:'));
@@ -132,6 +133,7 @@ async function main(): Promise<void> {
   }
 
   const includeVendored = args.includes('--include-vendored');
+  const includeWorkspaceProjects = args.includes('--include-workspace-projects');
   const requireProvenance = args.includes('--require-provenance');
 
   const excludes: string[] = [];
@@ -246,6 +248,7 @@ async function main(): Promise<void> {
 
   const scanOptions = {
     includeVendored,
+    includeWorkspaceProjects,
     exclude: excludes.length > 0 ? excludes : undefined,
     sentoriIgnorePatterns: sentoriIgnorePatterns.length > 0 ? sentoriIgnorePatterns : undefined,
   };

@@ -465,7 +465,7 @@ export const defenseAnalyzer: ScannerModule = {
     // Also include source files for architecture analysis
     let sourceFiles: string[] = [];
     try {
-      sourceFiles = await findFiles(targetPath, ['**/*.ts', '**/*.js', '**/*.py'], options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns);
+      sourceFiles = await findFiles(targetPath, ['**/*.ts', '**/*.js', '**/*.py'], options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns, options?.includeWorkspaceProjects);
     } catch {
       // Ignore errors finding source files
     }

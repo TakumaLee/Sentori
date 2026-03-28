@@ -417,6 +417,7 @@ export const environmentIsolationAuditor: ScannerModule = {
         options?.exclude,
         options?.includeVendored,
         options?.sentoriIgnorePatterns,
+        options?.includeWorkspaceProjects,
       );
     } catch {
       // If we can't find files, still do environment detection

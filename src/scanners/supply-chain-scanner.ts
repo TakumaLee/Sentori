@@ -602,7 +602,7 @@ export class SupplyChainScanner implements Scanner {
     const start = Date.now();
     const skillsDir = path.join(targetDir, 'skills');
     const scanDir = fs.existsSync(skillsDir) ? skillsDir : targetDir;
-    const files = walkFiles(scanDir, { includeVendored: options?.includeVendored, exclude: options?.exclude, sentoriIgnorePatterns: options?.sentoriIgnorePatterns });
+    const files = walkFiles(scanDir, { includeVendored: options?.includeVendored, exclude: options?.exclude, sentoriIgnorePatterns: options?.sentoriIgnorePatterns, includeWorkspaceProjects: options?.includeWorkspaceProjects });
     const findings: Finding[] = [];
 
     for (const file of files) {

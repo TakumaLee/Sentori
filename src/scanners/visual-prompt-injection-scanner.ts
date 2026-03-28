@@ -25,7 +25,7 @@ export class VisualPromptInjectionScanner implements Scanner {
     let scannedFiles = 0;
 
     // Scan code files
-    for (const file of walkFiles(targetPath, { includeVendored: options?.includeVendored, exclude: options?.exclude, sentoriIgnorePatterns: options?.sentoriIgnorePatterns })) {
+    for (const file of walkFiles(targetPath, { includeVendored: options?.includeVendored, exclude: options?.exclude, sentoriIgnorePatterns: options?.sentoriIgnorePatterns, includeWorkspaceProjects: options?.includeWorkspaceProjects })) {
       if (this.isCodeFile(file.path)) {
         scannedFiles++;
         const codeFindings = this.scanFile(file);
@@ -34,7 +34,7 @@ export class VisualPromptInjectionScanner implements Scanner {
     }
 
     // Scan image files only in deep-scan mode (OCR is slow)
-    const imageFiles = this.findImageFiles(targetPath, options?.exclude, options?.sentoriIgnorePatterns);
+    const imageFiles = this.findImageFiles(targetPath, options?.exclude, options?.sentoriIgnorePatterns, options?.includeWorkspaceProjects);
     if (!process.env.SENTORI_DEEP_SCAN) {
       // Without OCR, emit one INFO summary instead of per-image findings
       if (imageFiles.length > 0) {
@@ -75,9 +75,16 @@ export class VisualPromptInjectionScanner implements Scanner {
   /**
    * Find all image files in directory, respecting exclude and sentoriIgnore patterns.
    */
-  private findImageFiles(dir: string, exclude?: string[], sentoriIgnorePatterns?: string[]): string[] {
+  private findImageFiles(dir: string, exclude?: string[], sentoriIgnorePatterns?: string[], includeWorkspaceProjects?: boolean): string[] {
     const imageFiles: string[] = [];
     const allExcludePatterns = [...(exclude ?? []), ...(sentoriIgnorePatterns ?? [])];
+
+    const WORKSPACE_DIRS = new Set(['workspace', 'workspaces']);
+
+    function isProjectRoot(dirPath: string): boolean {
+      const markers = ['.git', 'package.json', 'pyproject.toml', 'Cargo.toml', 'go.mod', 'pom.xml'];
+      return markers.some(m => fs.existsSync(path.join(dirPath, m)));
+    }
 
     const skipDirs = new Set([
       'node_modules', '.git', 'dist', 'build', 'coverage', '.next',
@@ -102,6 +109,10 @@ export class VisualPromptInjectionScanner implements Scanner {
           const fullPath = path.join(currentDir, item.name);
           if (item.isDirectory()) {
             if (skipDirs.has(item.name)) continue;
+            // Skip workspace project subdirectories unless opted in
+            if (!includeWorkspaceProjects && WORKSPACE_DIRS.has(path.basename(currentDir))) {
+              if (isProjectRoot(fullPath)) continue;
+            }
             // Check user-supplied exclude patterns for directories
             if (allExcludePatterns.length > 0) {
               const relDir = path.relative(dir, fullPath);

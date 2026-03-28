@@ -576,7 +576,7 @@ export class HygieneAuditor implements Scanner {
   async scan(targetDir: string, options?: ScannerOptions): Promise<ScanResult> {
     const start = Date.now();
     const config = loadAgentConfig(targetDir);
-    const files = walkFiles(targetDir, { extensions: HYGIENE_SCAN_EXTENSIONS, includeVendored: options?.includeVendored, exclude: options?.exclude, sentoriIgnorePatterns: options?.sentoriIgnorePatterns });
+    const files = walkFiles(targetDir, { extensions: HYGIENE_SCAN_EXTENSIONS, includeVendored: options?.includeVendored, exclude: options?.exclude, sentoriIgnorePatterns: options?.sentoriIgnorePatterns, includeWorkspaceProjects: options?.includeWorkspaceProjects });
     const fileContents = [
       ...files.map((f) => ({ relativePath: f.relativePath, content: f.content })),
       ...collectExtraFiles(targetDir),

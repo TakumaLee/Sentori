@@ -466,7 +466,7 @@ export const channelSurfaceAuditor: ScannerModule = {
     // Also scan source files for code-level evidence of channel integrations
     const sourceFiles = await findFiles(targetPath, [
       '**/*.ts', '**/*.js', '**/*.py', '**/*.sh',
-    ], options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns);
+    ], options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns, options?.includeWorkspaceProjects);
 
     // Build a set of channels that have code-level evidence.
     // Channels without codeEvidencePatterns are always confirmed.

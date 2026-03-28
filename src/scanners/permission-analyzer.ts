@@ -17,7 +17,7 @@ export const permissionAnalyzer: ScannerModule = {
     // For framework context, check if any auth-related files exist in the project
     let projectHasAuthFiles = false;
     if (context === 'framework') {
-      const sourceFiles = await findFiles(targetPath, ['**/*.ts', '**/*.js', '**/*.py'], options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns);
+      const sourceFiles = await findFiles(targetPath, ['**/*.ts', '**/*.js', '**/*.py'], options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns, options?.includeWorkspaceProjects);
       projectHasAuthFiles = hasAuthFiles([...allFiles, ...sourceFiles]);
     }
 
