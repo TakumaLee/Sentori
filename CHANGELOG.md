@@ -4,9 +4,10 @@
 
 ## [Unreleased]
 
-## [0.10.1] - 2026-03-28
+## [0.11.0] - 2026-03-28
 
 ### Added
+- **`--include-workspace-projects` flag** — opt-in to scan sub-projects (repos with `.git`, `package.json`, `go.mod`, etc.) inside `workspace/` directories. **Default: skip** — drastically reduces noise when scanning agent runtime dirs like `~/.tetora`
 - **`--exclude` flag** — repeatable CLI option to exclude paths (glob patterns) from scanning
 - **`.sentoriignore` support** — gitignore-like file in scan target root for persistent exclusions
 - **`isTaskLogFile()` heuristic** — Supply Chain Scanner now detects and skips agent task output logs (JSON with `task_id` + `output`/`status`/`agent`)
@@ -21,10 +22,13 @@
 - **Permission Analyzer / Skill Auditor** — findings in cache/data directories downgraded to `info`
 - **Defense Analyzer** — distinguishes `.env`-only sensitive data from actual system prompt exposure
 - **Visual Prompt Injection Scanner** — emits single `info` summary without `--deep-scan` (was per-image `high`)
-- **Default skip directories** expanded: `outputs/`, `output/`, `data/`, `logs/`, `dbs/`, `vault/`, `uploads/`, `runtime/`, `snapshots/`, `crawl/`, `scraped/`, `downloaded/`
+- **Environment Isolation Auditor** — workspace content dirs excluded from sensitive config check (words like "token"/"key" in workspace JSON are not secrets)
+- **Supply Chain Scanner** — expanded runtime path skip list (`.next`, `coord`, `claims`, `reviews`, `state`, `shared`, `memory`)
+- **Default skip directories** expanded: `outputs/`, `output/`, `data/`, `logs/`, `dbs/`, `vault/`, `uploads/`, `runtime/`, `snapshots/`, `crawl/`, `scraped/`, `downloaded/`, `sessions/`, `cron-runs/`, `media/`, `.next/`
 
 ### Fixed
 - ~99% false positive rate when scanning AI agent workstation directories (`~/.tetora` scenario)
+- Scan time reduced ~50% for agent workstation targets (558s → 297s)
 
 ## [0.10.0] - 2026-03-27
 
