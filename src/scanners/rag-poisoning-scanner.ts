@@ -12,11 +12,66 @@ const WORKSPACE_CONFIG_PATTERNS = [
   /[/\\]\.tetora[/\\]workspace[/\\]knowledge[/\\]/i,
   /[/\\]\.tetora[/\\]workspace[/\\]skills?[/\\]/i,
   /[/\\]\.tetora[/\\]workspace[/\\]team[/\\]/i,
+  // Additional workspace content directories — operational/content files, not RAG attack vectors
+  /[/\\]\.tetora[/\\]workspace[/\\]devops[/\\]/i,
+  /[/\\]\.tetora[/\\]workspace[/\\]finance[/\\]/i,
+  /[/\\]\.tetora[/\\]workspace[/\\]scripts[/\\]/i,
+  /[/\\]\.tetora[/\\]workspace[/\\]products?[/\\]/i,
+  /[/\\]\.tetora[/\\]workspace[/\\]drafts?[/\\]/i,
+  /[/\\]\.tetora[/\\]workspace[/\\]research[/\\]/i,
+  /[/\\]\.tetora[/\\]workspace[/\\]content-queue[/\\]/i,
+  /[/\\]\.tetora[/\\]workspace[/\\]intel[/\\]/i,
+  /[/\\]\.tetora[/\\]workspace[/\\]reviews?[/\\]/i,
+  /[/\\]\.tetora[/\\]workspace[/\\]projects?[/\\]/i,
   /[/\\]\.openclaw[/\\]workspace[/\\]/i,
 ];
 
 function isWorkspaceConfigFile(filePath: string): boolean {
   return WORKSPACE_CONFIG_PATTERNS.some(p => p.test(filePath));
+}
+
+/**
+ * Returns true for files that are security-related documentation or article
+ * drafts — e.g. Medium.com drafts, product docs, guides, or tutorials.
+ *
+ * Such files discuss prompt injection and agent security *as a topic*.  The
+ * patterns they contain are illustrative examples, not live attacks.  We
+ * downgrade their findings by one severity level to reduce false positives.
+ */
+function isSecurityDocumentationFile(filePath: string, content: string): boolean {
+  const normalized = filePath.replace(/\\/g, '/');
+
+  // Medium.com article drafts
+  if (/\/drafts\/medium\//.test(normalized)) return true;
+
+  // General drafts that look like articles or guides
+  if (/\/drafts\//.test(normalized)) {
+    if (/\b(?:article|guide|tutorial)\b/i.test(content)) return true;
+    // Has YAML/TOML-style frontmatter (common in article drafts)
+    if (/^---\s*\n/.test(content)) return true;
+  }
+
+  // Product documentation directory
+  if (/\/products\//.test(normalized)) return true;
+
+  // File looks like an article: has multiple heading lines (# or ##)
+  const headingMatches = (content.match(/^#{1,3}\s+\S/gm) || []).length;
+  if (headingMatches >= 3) return true;
+
+  return false;
+}
+
+/**
+ * Downgrade a severity by one level.
+ * critical → high, high → medium, medium → info, info → info.
+ */
+function downgradeSeverityByOne(severity: string): string {
+  switch (severity) {
+    case 'critical': return 'high';
+    case 'high':     return 'medium';
+    case 'medium':   return 'info';
+    default:         return severity;
+  }
 }
 
 /**
@@ -167,6 +222,12 @@ export const ragPoisoningScanner: ScannerModule = {
       const content = readFileContent(file);
       const lines = content.split('\n');
 
+      // Security documentation files (article drafts, guides, product docs) discuss
+      // injection patterns as examples.  Track findings added for this file so we
+      // can downgrade them by one severity level before moving on.
+      const isSecDoc = isSecurityDocumentationFile(file, content);
+      const findingsBeforeFile = findings.length;
+
       // Check for prompt injection (CRITICAL)
       for (const pattern of PROMPT_INJECTION_PATTERNS) {
         let match: RegExpExecArray | null;
@@ -258,7 +319,11 @@ export const ragPoisoningScanner: ScannerModule = {
       }
 
       // Check for repetition attacks (HIGH severity)
-      const repetitionCheck = detectRepetitionAttack(content);
+      // Skip structured data files — JSON/YAML/CSV have repeated keys/patterns by design
+      const isStructuredData = /\.(json|yaml|yml|csv|tsv|xml)$/i.test(file);
+      const repetitionCheck = isStructuredData
+        ? { isAttack: false, repeatedContent: '', count: 0, percentage: 0 }
+        : detectRepetitionAttack(content);
       if (repetitionCheck.isAttack) {
         findings.push({
           scanner: this.name,
@@ -302,6 +367,18 @@ export const ragPoisoningScanner: ScannerModule = {
             confidence: 'possible',
             isTestFile,
           });
+        }
+      }
+
+      // Downgrade findings for security documentation files by one severity level.
+      // These files discuss injection patterns as educational examples, not live attacks.
+      if (isSecDoc) {
+        for (let i = findingsBeforeFile; i < findings.length; i++) {
+          const f = findings[i];
+          f.severity = downgradeSeverityByOne(f.severity) as typeof f.severity;
+          if (f.description) {
+            f.description += ' [security documentation — severity reduced by 1 level]';
+          }
         }
       }
     }

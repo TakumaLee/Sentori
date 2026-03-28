@@ -310,8 +310,10 @@ export class ConventionSquattingScanner implements Scanner {
         // Skip arbitrary files that aren't known convention files
         if (!isKnown && !isHeartbeat) continue;
 
-        let severity: Severity = isHeartbeat ? 'high' : 'medium';
-        const rec = isHeartbeat
+        // Heartbeat files inside workspace/ are the agent's own status files — low risk.
+        const inWorkspace = /(?:^|[/\\])workspace[/\\]/.test(file.relativePath);
+        let severity: Severity = (isHeartbeat && !inWorkspace) ? 'high' : 'info';
+        const rec = (isHeartbeat && !inWorkspace)
           ? 'CRITICAL: This file is read periodically — a squatted domain would enable persistent injection. Use absolute local paths and validate file source is local filesystem, not network.'
           : 'Filename resolves as a valid domain. Ensure agent reads via local fs path, not URL resolution. Add integrity checks (hash verification) for convention files.';
 

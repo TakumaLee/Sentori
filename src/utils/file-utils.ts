@@ -277,23 +277,33 @@ export async function findFiles(targetPath: string, patterns: string[], excludeP
     for (const wsName of ['workspace', 'workspaces']) {
       const wsDir = path.join(absTarget, wsName);
       if (fs.existsSync(wsDir) && fs.statSync(wsDir).isDirectory()) {
-        try {
-          const entries = fs.readdirSync(wsDir, { withFileTypes: true });
-          for (const entry of entries) {
-            if (!entry.isDirectory()) continue;
-            const subDir = path.join(wsDir, entry.name);
-            const items = fs.readdirSync(subDir).map(i => i);
-            const hasProjectMarker = items.includes('.git') || [
-              'package.json', 'go.mod', 'Cargo.toml', 'pyproject.toml',
-              'setup.py', 'requirements.txt', 'pubspec.yaml', 'Gemfile',
-              'pom.xml', 'build.gradle', 'build.gradle.kts',
-              'CMakeLists.txt', 'composer.json', 'mix.exs',
-            ].some(m => items.includes(m));
-            if (hasProjectMarker) {
-              ignoreList.push(`${wsName}/${entry.name}/**`);
+        // Recursively find project roots inside workspace/ at any depth
+        const findProjectRoots = (dir: string, relPrefix: string) => {
+          try {
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            for (const entry of entries) {
+              if (!entry.isDirectory()) continue;
+              // Skip common non-project dirs
+              if (['.git', 'node_modules', '.next', 'dist', 'build', '.cache'].includes(entry.name)) continue;
+              const subDir = path.join(dir, entry.name);
+              const relPath = relPrefix + '/' + entry.name;
+              const items = fs.readdirSync(subDir);
+              const markers = ['.git', 'package.json', 'go.mod', 'Cargo.toml', 'pyproject.toml',
+                'setup.py', 'requirements.txt', 'pubspec.yaml', 'Gemfile',
+                'pom.xml', 'build.gradle', 'build.gradle.kts',
+                'CMakeLists.txt', 'composer.json', 'mix.exs'];
+              if (markers.some(m => items.includes(m))) {
+                ignoreList.push(relPath.slice(1) + '/**'); // remove leading /
+              } else {
+                // Not a project root, recurse deeper (max 4 levels from workspace/)
+                if (relPrefix.split('/').length < 5) {
+                  findProjectRoots(subDir, relPath);
+                }
+              }
             }
-          }
-        } catch { /* skip unreadable */ }
+          } catch { /* skip unreadable */ }
+        };
+        findProjectRoots(wsDir, '/' + wsName);
       }
     }
   }

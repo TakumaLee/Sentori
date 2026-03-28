@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import * as yaml from 'js-yaml';
 import { ScannerModule, ScanResult, Finding, ScanContext, ScannerOptions } from '../types';
 import { findConfigFiles, findPromptFiles, readFileContent, isJsonFile, isYamlFile, tryParseJson, isTestOrDocFile, hasAuthFiles, findFiles, isCacheOrDataFile, isSentoriSourceFile, isMarkdownFile, applyContextDowngrades } from '../utils/file-utils';
@@ -10,6 +12,14 @@ export const permissionAnalyzer: ScannerModule = {
     const start = Date.now();
     const findings: Finding[] = [];
     const context = options?.context || 'app';
+
+    // In an agent system, tools having broad access is by design — the agent needs
+    // to operate.  Downgrade "unrestricted access" findings from critical to medium
+    // to avoid flooding the report with expected design choices.
+    const isAgentSystem =
+      fs.existsSync(path.join(targetPath, 'agents')) ||
+      fs.existsSync(path.join(targetPath, 'workspace'));
+
     const configFiles = await findConfigFiles(targetPath, options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns);
     const promptFiles = await findPromptFiles(targetPath, options?.exclude, options?.includeVendored, options?.sentoriIgnorePatterns);
     const allFiles = [...new Set([...configFiles, ...promptFiles])];
@@ -185,6 +195,21 @@ export const permissionAnalyzer: ScannerModule = {
         else if (f.severity === 'high') f.severity = 'info';
         if (!f.description!.includes('[test/doc file')) {
           f.description! += ' [test/doc file — severity reduced]';
+        }
+      }
+    }
+
+    // Agent system: tools having broad access is by design.
+    // Downgrade "unrestricted access" and "no permission boundaries" findings
+    // from critical to medium so they don't dominate the report.
+    if (isAgentSystem) {
+      for (const f of findings) {
+        if (
+          f.severity === 'critical' &&
+          f.id?.startsWith('PERM-TOOL-UNRESTRICTED')
+        ) {
+          f.severity = 'medium';
+          f.description! += ' [agent system — broad tool access is expected; severity reduced to medium]';
         }
       }
     }
@@ -472,17 +497,6 @@ function getAllKeys(obj: Record<string, unknown>, depth = 0, maxDepth = 3): Set<
     }
   }
   return keys;
-}
-
-/**
- * Quick check: is this JSON file a tool/MCP config (vs plain data)?
- * Parses the content and delegates to isToolOrMcpConfig.
- */
-function isToolOrMcpConfigContent(filePath: string, content: string): boolean {
-  if (!isJsonFile(filePath)) return false;
-  const parsed = tryParseJson(content);
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
-  return isToolOrMcpConfig(parsed as Record<string, unknown>);
 }
 
 /**

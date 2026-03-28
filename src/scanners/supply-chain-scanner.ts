@@ -575,6 +575,51 @@ function isRuntimeDataPath(filePath: string): boolean {
   return RUNTIME_PATH_PATTERNS.some(p => p.test(normalized));
 }
 
+/**
+ * Returns true for files that are part of the agent system's own infrastructure
+ * rather than untrusted third-party code.  Findings in these files should be
+ * capped at `medium` because:
+ *   - Markdown files describe commands (documentation), they don't execute them.
+ *   - Scripts in the agent's own root-level scripts/ directory are part of the
+ *     system's intended operation and are not injected supply-chain content.
+ */
+function isAgentSystemFile(filePath: string): boolean {
+  const normalized = filePath.replace(/\\/g, '/');
+  const basename = path.basename(normalized).toLowerCase();
+
+  // Known agent system markdown files
+  const AGENT_MD_FILES = new Set(['heartbeat.md', 'skill.md', 'readme.md']);
+  if (AGENT_MD_FILES.has(basename)) return true;
+
+  // All markdown files — documentation, not executable
+  if (normalized.endsWith('.md')) return true;
+
+  // Scripts in the agent's own root-level scripts/ directory
+  // Match /scripts/ only when it is at the top of the relative path (not nested
+  // inside workspace projects like workspace/projects/foo/scripts/)
+  if (/^scripts\//.test(normalized) || /^[^/]+\/scripts\//.test(normalized)) {
+    // Exclude scripts that are clearly inside workspace project subdirectories
+    if (!/\/workspace\//.test(normalized) && !/\/projects\//.test(normalized)) {
+      return true;
+    }
+  }
+
+  // workspace/ subdirectories contain legitimate agent infrastructure, documentation,
+  // and operational files — not injected supply-chain content.
+  if (/(?:^|[/\\])workspace[/\\](?:devops|finance|skills|scripts|memory|knowledge|rules|products|drafts|research|content-queue|intel|team|reviews|reports|tasks|projects)[/\\]/.test(normalized)) return true;
+
+  return false;
+}
+
+/**
+ * Cap a finding's severity at `medium`.
+ * critical → medium, high → medium; medium and info are unchanged.
+ */
+function capSeverityAtMedium(severity: Severity): Severity {
+  if (severity === 'critical' || severity === 'high') return 'medium';
+  return severity;
+}
+
 // --- Scanner class ---
 
 export class SupplyChainScanner implements Scanner {
@@ -612,8 +657,17 @@ export class SupplyChainScanner implements Scanner {
       // Skip task output log files (Tetora/agent schema: has task_id + output + status/agent)
       if (file.path.endsWith('.json') && isTaskLogFile(file.content)) continue;
 
+      const agentSystemFile = isAgentSystemFile(file.relativePath);
+
       for (const rule of this.rules) {
-        findings.push(...rule.check(file));
+        const ruleFindings = rule.check(file);
+        if (agentSystemFile) {
+          // Markdown and agent-system scripts describe operations; cap severity at medium
+          for (const f of ruleFindings) {
+            f.severity = capSeverityAtMedium(f.severity);
+          }
+        }
+        findings.push(...ruleFindings);
       }
     }
 

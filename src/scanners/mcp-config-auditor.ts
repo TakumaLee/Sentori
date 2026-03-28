@@ -363,12 +363,15 @@ export function auditToolDescriptionPoisoning(config: Record<string, unknown>, f
     const descValue = match.replace(/"description"\s*:\s*"/i, '').replace(/"$/, '');
     for (const pattern of TOOL_DESCRIPTION_POISON_PATTERNS) {
       if (pattern.test(descValue)) {
+        // Workspace skill metadata files describe what the skill does — "read tweets",
+        // "post to X" are normal descriptions, not poisoning.  Cap at medium.
+        const isWorkspaceSkill = filePath && /(?:^|[/\\])workspace[/\\]skills?[/\\]/.test(filePath);
         findings.push({
           id: `MCP-POISON-DESC`,
           scanner: 'mcp-config-auditor',
-          severity: 'critical',
+          severity: isWorkspaceSkill ? 'medium' : 'critical',
           title: 'Suspicious tool description: potential poisoning',
-          description: `A tool description contains suspicious patterns that may indicate tool description poisoning: "${descValue.substring(0, 120)}..."`,
+          description: `A tool description contains suspicious patterns that may indicate tool description poisoning: "${descValue.substring(0, 120)}..."${isWorkspaceSkill ? ' [workspace skill — severity reduced]' : ''}`,
           file: filePath,
           recommendation: 'Review all MCP tool descriptions carefully. Tool descriptions should only describe functionality, not contain hidden instructions. See MCP-ITP research for attack details.',
         });

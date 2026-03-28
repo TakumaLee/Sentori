@@ -101,7 +101,7 @@ export class VisualPromptInjectionScanner implements Scanner {
       'cron-runs',
     ]);
 
-    const walk = (currentDir: string): void => {
+    const walk = (currentDir: string, inWorkspace: boolean): void => {
       if (!fs.existsSync(currentDir)) return;
       try {
         const items = fs.readdirSync(currentDir, { withFileTypes: true });
@@ -109,16 +109,21 @@ export class VisualPromptInjectionScanner implements Scanner {
           const fullPath = path.join(currentDir, item.name);
           if (item.isDirectory()) {
             if (skipDirs.has(item.name)) continue;
-            // Skip workspace project subdirectories unless opted in
-            if (!includeWorkspaceProjects && WORKSPACE_DIRS.has(path.basename(currentDir))) {
-              if (isProjectRoot(fullPath)) continue;
+
+            const isWsDir = WORKSPACE_DIRS.has(item.name);
+            const nextInWorkspace = inWorkspace || isWsDir;
+
+            // Skip project roots inside workspace/ at any depth (default: off)
+            if (!includeWorkspaceProjects && nextInWorkspace && !isWsDir && isProjectRoot(fullPath)) {
+              continue;
             }
+
             // Check user-supplied exclude patterns for directories
             if (allExcludePatterns.length > 0) {
               const relDir = path.relative(dir, fullPath);
               if (shouldIgnoreFile(relDir + '/x', allExcludePatterns)) continue;
             }
-            walk(fullPath);
+            walk(fullPath, nextInWorkspace);
           } else if (item.isFile()) {
             const ext = path.extname(item.name).toLowerCase();
             if (['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'].includes(ext)) {
@@ -136,7 +141,7 @@ export class VisualPromptInjectionScanner implements Scanner {
       }
     };
 
-    walk(dir);
+    walk(dir, false);
     return imageFiles;
   }
 
@@ -144,8 +149,18 @@ export class VisualPromptInjectionScanner implements Scanner {
     return /\.(ts|js|tsx|jsx|py|go|rs|java)$/.test(filePath);
   }
 
-  private isImageFile(filePath: string): boolean {
-    return /\.(jpg|jpeg|png|webp|gif|bmp)$/i.test(filePath);
+  /**
+   * Returns true for files that live under workspace content directories.
+   * These files contain references to AI models as data/documentation (e.g. SQL
+   * CASE statements mapping model names for cost calculation, skill descriptions
+   * mentioning clipboard/markdown), NOT actual vision API call sites.
+   * Code-level vision API checks should be skipped for these files.
+   */
+  private isWorkspaceContentFile(filePath: string): boolean {
+    const normalized = filePath.replace(/\\/g, '/');
+    // Match workspace/<subdir>/ where subdir is a known content directory.
+    // Excludes workspace/projects/ — those are actual code projects.
+    return /\/workspace\/(finance|skills|devops|scripts|memory|knowledge|rules|products|drafts|research|content-queue|intel|team|reviews)\//.test(normalized);
   }
 
   /**
@@ -290,6 +305,13 @@ export class VisualPromptInjectionScanner implements Scanner {
     const findings: Finding[] = [];
     const content = file.content;
     const filePath = file.path;
+
+    // Workspace content files (finance/, skills/, devops/, etc.) reference AI model
+    // names as data strings — e.g. SQL CASE statements for cost calculations, skill
+    // descriptions mentioning clipboard/markdown.  These are not vision API call sites.
+    if (this.isWorkspaceContentFile(filePath)) {
+      return findings;
+    }
 
     // Pattern 1: Vision API usage without input validation
     findings.push(...this.detectVisionAPIUsage(content, filePath));

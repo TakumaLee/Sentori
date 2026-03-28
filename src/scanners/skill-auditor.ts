@@ -354,6 +354,18 @@ export const skillAuditor: ScannerModule = {
           }
         }
 
+        // Workspace scripts (test scripts, init scripts, devops) naturally read config files
+        // and environment variables — cap at medium for these files
+        const isWorkspaceScript = /(?:^|[/\\])workspace[/\\](?:scripts|devops|tools)[/\\]/.test(file);
+        if (isWorkspaceScript) {
+          for (const f of fileFindings) {
+            if (f.id!.startsWith('SA-002-') && f.title === 'Reading sensitive file' && (f.severity === 'critical' || f.severity === 'high')) {
+              f.severity = 'medium';
+              f.description += ' [workspace script — reading config files is expected behavior]';
+            }
+          }
+        }
+
         // API client files: SA-001 env+network patterns are expected behavior
         if (isApiClientFile(file, content)) {
           for (const f of fileFindings) {

@@ -98,7 +98,7 @@ export function walkFiles(dir: string, extensionsOrOpts?: Set<string> | WalkOpti
 
   const entries: FileEntry[] = [];
 
-  function walk(currentDir: string): void {
+  function walk(currentDir: string, inWorkspace: boolean): void {
     if (!fs.existsSync(currentDir)) return;
     const items = fs.readdirSync(currentDir, { withFileTypes: true });
     for (const item of items) {
@@ -120,16 +120,21 @@ export function walkFiles(dir: string, extensionsOrOpts?: Set<string> | WalkOpti
         ]);
         if (skipDirs.has(item.name)) continue;
         if (!includeVendored && VENDORED_SKIP_DIRS.has(item.name)) continue;
-        // Skip sub-projects inside workspace/ directories (default: off)
-        if (!includeWorkspaceProjects && WORKSPACE_DIRS.has(path.basename(currentDir))) {
-          if (isProjectRoot(fullPath)) continue;
+
+        const isWsDir = WORKSPACE_DIRS.has(item.name);
+        const nextInWorkspace = inWorkspace || isWsDir;
+
+        // Skip project roots inside workspace/ at any depth (default: off)
+        if (!includeWorkspaceProjects && nextInWorkspace && !isWsDir && isProjectRoot(fullPath)) {
+          continue;
         }
+
         // Check user-supplied exclude patterns for directories
         if (allExcludePatterns.length > 0) {
           const relDir = path.relative(dir, fullPath);
           if (shouldIgnoreFile(relDir + '/x', allExcludePatterns)) continue;
         }
-        walk(fullPath);
+        walk(fullPath, nextInWorkspace);
       } else if (item.isFile()) {
         const ext = path.extname(item.name).toLowerCase();
         if (exts.has(ext) || item.name === 'SKILL.md' || item.name === 'Makefile') {
@@ -158,6 +163,6 @@ export function walkFiles(dir: string, extensionsOrOpts?: Set<string> | WalkOpti
     }
   }
 
-  walk(dir);
+  walk(dir, false);
   return entries;
 }
