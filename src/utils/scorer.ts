@@ -31,15 +31,49 @@ const OWN_CODE_WEIGHT = 1.0;
 
 // Scanner → dimension mapping
 const DIMENSION_MAP: Record<string, 'codeSafety' | 'configSafety' | 'defenseScore' | 'environmentSafety'> = {
+  // Code Safety — direct attack surface: secrets, injection, supply chain
   'Secret Leak Scanner': 'codeSafety',
   'Prompt Injection Tester': 'codeSafety',
   'Skill Auditor': 'codeSafety',
+  'LangChainSerializationScanner': 'codeSafety',
+  'Visual Prompt Injection Scanner': 'codeSafety',
+
+  // Config Safety — MCP, permissions, channels, conventions
   'MCP Config Auditor': 'configSafety',
   'Permission Analyzer': 'configSafety',
   'Channel Surface Auditor': 'configSafety',
+  'ConventionSquattingScanner': 'configSafety',
+  'Tetora Config Auditor': 'configSafety',
+  'MCP Tool Manifest Scanner': 'configSafety',
+  'MCP Tool Shadowing Detector': 'configSafety',
+  'MCP Tool Result Injection Scanner': 'configSafety',
+  'MCP Git CVE Scanner': 'configSafety',
+  'MCP Sampling Abuse Scanner': 'configSafety',
+  'MCP OAuth Auditor': 'configSafety',
+  'IDE Rule Injection Scanner': 'configSafety',
+  'Agent Config Auditor': 'configSafety',
+  'A2A Security Scanner': 'configSafety',
+  'GitHub MCP Toxic Flow Scanner': 'configSafety',
+
+  // Defense Score — defense layers, red team resilience, RAG protection
   'Defense Analyzer': 'defenseScore',
   'Red Team Simulator': 'defenseScore',
+  'RAG Poisoning Scanner': 'defenseScore',
+
+  // Code Safety — supply chain attacks target code/skills directly
+  'SupplyChainScanner': 'codeSafety',
+  'PostinstallScanner': 'codeSafety',
+  'NPM Attestation Scanner': 'codeSafety',
+  'AgenticFrameworkScanner': 'codeSafety',
+
+  // Config Safety — hygiene, credential management
+  'HygieneAuditor': 'configSafety',
+
+  // Environment Safety — isolation, runtime environment, exfiltration channels
   'Environment Isolation Auditor': 'environmentSafety',
+  'DxtSecurityScanner': 'environmentSafety',
+  'Clipboard Exfiltration Scanner': 'environmentSafety',
+  'DNS/ICMP Tool Scanner': 'environmentSafety',
 };
 
 function diminishingPenalty(count: number, basePenalty: number, maxPenalty: number): number {

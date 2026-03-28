@@ -270,12 +270,18 @@ const PERSISTENCE_PATTERNS: Array<{ pattern: RegExp; desc: string }> = [
   { pattern: /ProgramArguments/gi, desc: 'LaunchAgent ProgramArguments key' },
 ];
 
+/** Non-executable file extensions — mentioning "crontab" in docs is not a persistence attack. */
+const DOC_EXTENSIONS = new Set(['.md', '.txt', '.rst', '.adoc', '.csv', '.tsv', '.log']);
+
 const persistenceRule: Rule = {
   id: 'SUPPLY-006',
   severity: 'high',
   check(file: FileEntry): Finding[] {
     const findings: Finding[] = [];
     const isThirdParty = isThirdPartyCode(file.path);
+    const ext = path.extname(file.path).toLowerCase();
+    const isDocFile = DOC_EXTENSIONS.has(ext);
+
     for (const { pattern, desc } of PERSISTENCE_PATTERNS) {
       const regex = new RegExp(pattern.source, pattern.flags);
       let match: RegExpExecArray | null;
@@ -283,10 +289,11 @@ const persistenceRule: Rule = {
         findings.push({
           scanner: 'SupplyChainScanner',
           rule: 'SUPPLY-006',
-          severity: 'high',
+          // Documentation files only mention persistence mechanisms, they don't execute them
+          severity: isDocFile ? 'info' : 'high',
           file: file.relativePath,
           line: findLineNumber(file.content, match.index),
-          message: `Persistence mechanism: ${desc}`,
+          message: `Persistence mechanism: ${desc}${isDocFile ? ' [documentation reference]' : ''}`,
           evidence: match[0].substring(0, 120),
           isThirdParty,
         });
