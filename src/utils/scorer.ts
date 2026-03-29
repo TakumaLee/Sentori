@@ -1,4 +1,5 @@
 import { ReportSummary, ScanResult, Severity, Confidence, Finding } from '../types';
+import { CUSTOM_RULES_SCANNER_NAME } from '../scanners/custom-rules-scanner';
 
 // Diminishing returns: first findings of each severity hurt more,
 // but additional ones have less impact (logarithmic scaling)
@@ -55,10 +56,11 @@ const DIMENSION_MAP: Record<string, 'codeSafety' | 'configSafety' | 'defenseScor
   'A2A Security Scanner': 'configSafety',
   'GitHub MCP Toxic Flow Scanner': 'configSafety',
 
-  // Defense Score — defense layers, red team resilience, RAG protection
+  // Defense Score — defense layers, red team resilience, RAG protection, language register
   'Defense Analyzer': 'defenseScore',
   'Red Team Simulator': 'defenseScore',
   'RAG Poisoning Scanner': 'defenseScore',
+  'Language Register Scanner': 'codeSafety',
 
   // Code Safety — supply chain attacks target code/skills directly
   'SupplyChainScanner': 'codeSafety',
@@ -74,6 +76,13 @@ const DIMENSION_MAP: Record<string, 'codeSafety' | 'configSafety' | 'defenseScor
   'DxtSecurityScanner': 'environmentSafety',
   'Clipboard Exfiltration Scanner': 'environmentSafety',
   'DNS/ICMP Tool Scanner': 'environmentSafety',
+
+  // Code Safety — user-defined rules; supply chain version-conflict detection
+  [CUSTOM_RULES_SCANNER_NAME]: 'codeSafety',
+  'PackageGateScanner': 'codeSafety',
+
+  // Config Safety — prototype MCP server config auditor
+  'MCP Server Auditor (Prototype)': 'configSafety',
 };
 
 function diminishingPenalty(count: number, basePenalty: number, maxPenalty: number): number {
