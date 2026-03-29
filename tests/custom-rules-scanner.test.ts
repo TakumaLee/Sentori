@@ -159,4 +159,32 @@ describe('runCustomRules', () => {
     expect(result.findings[1].line).toBe(1);
     fs.rmSync(dir, { recursive: true, force: true });
   });
+
+  test('vendored dirs are skipped by default', async () => {
+    const dir = makeTmpDir();
+    writeFile(dir, 'src/app.ts', 'AKIAIOSFODNN7EXAMPLE1');
+    writeFile(dir, 'vendor/lib.ts', 'AKIAIOSFODNN7EXAMPLE2');
+    writeFile(dir, 'third_party/code.ts', 'AKIAIOSFODNN7EXAMPLE3');
+    const rule = makeRule();
+
+    const result = await runCustomRules(dir, [rule]);
+
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0].file).toBe('src/app.ts');
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('includeVendored: true scans VENDORED_IGNORE directories (e.g. third_party)', async () => {
+    const dir = makeTmpDir();
+    writeFile(dir, 'src/app.ts', 'AKIAIOSFODNN7EXAMPLE1');
+    writeFile(dir, 'third_party/code.ts', 'AKIAIOSFODNN7EXAMPLE2');
+    const rule = makeRule();
+
+    const result = await runCustomRules(dir, [rule], { includeVendored: true });
+
+    expect(result.findings).toHaveLength(2);
+    const files = result.findings.map((f) => f.file).sort();
+    expect(files).toEqual(['src/app.ts', 'third_party/code.ts']);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
 });
