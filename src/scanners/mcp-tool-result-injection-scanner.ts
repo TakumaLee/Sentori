@@ -305,7 +305,8 @@ const CONTENT_FIELDS = new Set(['text', 'content', 'result', 'output', 'response
 // Helpers
 // ============================================================
 
-function categorizeTool(toolName: string, serverCommand?: string, serverArgs?: string[]): string | null {
+/** @internal — exported for testing */
+export function categorizeTool(toolName: string, serverCommand?: string, serverArgs?: string[]): string | null {
   const needle = toolName.toLowerCase();
 
   for (const { patterns, category } of TOOL_NAME_PATTERNS) {
@@ -331,7 +332,8 @@ function categorizeTool(toolName: string, serverCommand?: string, serverArgs?: s
   return null;
 }
 
-function categorizeServer(serverName: string, command?: string, args?: string[]): string | null {
+/** @internal — exported for testing */
+export function categorizeServer(serverName: string, command?: string, args?: string[]): string | null {
   const hint = [serverName, command ?? '', ...(args ?? [])].join(' ');
   for (const { patterns, category } of KNOWN_SERVER_CATEGORY_MAP) {
     for (const p of patterns) {
@@ -341,8 +343,8 @@ function categorizeServer(serverName: string, command?: string, args?: string[])
   return null;
 }
 
-/** Recursively extract all string values from a JSON structure, with their key paths. */
-function extractStringValues(obj: unknown, keyPath = ''): Array<{ path: string; value: string }> {
+/** Recursively extract all string values from a JSON structure, with their key paths. @internal — exported for testing */
+export function extractStringValues(obj: unknown, keyPath = ''): Array<{ path: string; value: string }> {
   const results: Array<{ path: string; value: string }> = [];
 
   if (typeof obj === 'string') {
@@ -358,8 +360,8 @@ function extractStringValues(obj: unknown, keyPath = ''): Array<{ path: string; 
   return results;
 }
 
-/** Check if a JSON structure looks like a MCP tool response or mock fixture. */
-function looksLikeToolResponse(obj: unknown): boolean {
+/** Check if a JSON structure looks like a MCP tool response or mock fixture. @internal — exported for testing */
+export function looksLikeToolResponse(obj: unknown): boolean {
   if (typeof obj !== 'object' || obj === null) return false;
   const keys = Object.keys(obj as Record<string, unknown>).map(k => k.toLowerCase());
   return (
@@ -373,7 +375,8 @@ function looksLikeToolResponse(obj: unknown): boolean {
  * Scan a parsed JSON/YAML object for injection patterns.
  * Only scan string values in content-carrying fields.
  */
-function scanFixtureObject(
+/** @internal — exported for testing */
+export function scanFixtureObject(
   obj: unknown,
   filePath: string,
   scannerName: string
@@ -429,7 +432,8 @@ const DEFENSE_PATTERNS: RegExp[] = [
   /checkFor(?:Injection|Prompt|Attack)/i,
 ];
 
-function hasOutputValidationDefense(targetPath: string): boolean {
+/** @internal — exported for testing */
+export function hasOutputValidationDefense(targetPath: string): boolean {
   try {
     // Quick grep through JS/TS/Python source files
     const sourceFiles = (() => {
@@ -471,7 +475,8 @@ interface ParsedTool {
   serverArgs?: string[];
 }
 
-function parseToolsFromConfig(raw: Record<string, unknown>): ParsedTool[] {
+/** @internal — exported for testing */
+export function parseToolsFromConfig(raw: Record<string, unknown>): ParsedTool[] {
   const tools: ParsedTool[] = [];
 
   const mcpServers =
