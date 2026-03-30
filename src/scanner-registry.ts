@@ -1,6 +1,8 @@
 import { Scanner, ScannerOptions, ScanReport, ScanResult } from './types';
 import { calculateSummary } from './utils/scorer';
 
+const DEFAULT_SCANNER_TIMEOUT_MS = 30_000;
+
 export class ScannerRegistry {
   private scanners: Scanner[] = [];
 
@@ -20,6 +22,8 @@ export class ScannerRegistry {
     const timestamp = new Date().toISOString();
     const total = this.scanners.length;
     const results: ScanResult[] = new Array(total);
+    const timeout = options?.timeout ?? DEFAULT_SCANNER_TIMEOUT_MS;
+    const signal = options?.signal;
 
     // Run scanners in parallel with concurrency limit of 5
     const CONCURRENCY = 5;
@@ -30,14 +34,54 @@ export class ScannerRegistry {
       while (nextIndex < total) {
         const i = nextIndex++;
         const scanner = this.scanners[i];
+
+        // Skip if already aborted
+        if (signal?.aborted) {
+          results[i] = {
+            scanner: scanner.name,
+            findings: [],
+            duration: 0,
+            error: 'aborted',
+          };
+          completedCount++;
+          onProgress?.(completedCount, total, scanner.name, results[i]);
+          continue;
+        }
+
         onProgress?.(completedCount + 1, total, scanner.name);
-        // Module-based scanners (ScannerModule) accept an optional second options
-        // argument. Class-based legacy scanners ignore extra arguments in JS, so
-        // it is safe to always pass options — they will silently be discarded.
-        const result = await (scanner.scan as (dir: string, opts?: ScannerOptions) => Promise<ScanResult>).call(scanner, targetDir, options);
-        results[i] = result;
+
+        const start = Date.now();
+        try {
+          const scanPromise = scanner.scan(targetDir, options);
+          let timer: ReturnType<typeof setTimeout>;
+          const timeoutPromise = new Promise<null>((resolve) => {
+            timer = setTimeout(() => resolve(null), timeout);
+          });
+
+          const result = await Promise.race([scanPromise, timeoutPromise]);
+          clearTimeout(timer!);
+
+          if (result === null) {
+            results[i] = {
+              scanner: scanner.name,
+              findings: [],
+              duration: Date.now() - start,
+              error: `timeout after ${timeout}ms`,
+            };
+          } else {
+            results[i] = result;
+          }
+        } catch (err) {
+          results[i] = {
+            scanner: scanner.name,
+            findings: [],
+            duration: Date.now() - start,
+            error: String(err),
+          };
+        }
+
         completedCount++;
-        onProgress?.(completedCount, total, scanner.name, result);
+        onProgress?.(completedCount, total, scanner.name, results[i]);
       }
     };
 

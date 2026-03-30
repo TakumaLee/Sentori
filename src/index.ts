@@ -35,8 +35,7 @@ export { walkFiles } from './utils/file-walker';
 export * from './types';
 
 import { ScannerRegistry } from './scanner-registry';
-import { Scanner } from './types';
-// Class-based scanners (Scanner interface)
+// Class-based scanners
 import { SupplyChainScanner } from './scanners/supply-chain-scanner';
 import { HygieneAuditor } from './scanners/hygiene-auditor';
 import { DxtSecurityScanner } from './scanners/dxt-security-scanner';
@@ -45,7 +44,7 @@ import { LangChainSerializationScanner } from './scanners/langchain-serializatio
 import { AgenticFrameworkScanner } from './scanners/agentic-framework-scanner';
 import { PostinstallScanner } from './scanners/postinstall-scanner';
 import { ConventionSquattingScanner } from './scanners/convention-squatting-scanner';
-// Module-based scanners (ScannerModule interface, compatible with Scanner)
+// Module-based scanners
 import { agentConfigAuditor } from './scanners/agent-config-auditor';
 import { channelSurfaceAuditor } from './scanners/channel-surface-auditor';
 import { clipboardExfiltrationScanner } from './scanners/clipboard-exfiltration-scanner';
@@ -81,34 +80,34 @@ export function createDefaultRegistry(externalIOCPath?: string): ScannerRegistry
   registry.register(new VisualPromptInjectionScanner());
   registry.register(new LangChainSerializationScanner());
   registry.register(new AgenticFrameworkScanner());
-  registry.register(npmAttestationScanner as unknown as Scanner);
+  registry.register(npmAttestationScanner);
   registry.register(new PostinstallScanner());
   registry.register(new ConventionSquattingScanner());
 
-  // Module-based scanners (cast to Scanner — structurally compatible)
-  registry.register(agentConfigAuditor as unknown as Scanner);
-  registry.register(channelSurfaceAuditor as unknown as Scanner);
-  registry.register(clipboardExfiltrationScanner as unknown as Scanner);
-  registry.register(defenseAnalyzer as unknown as Scanner);
-  registry.register(dnsIcmpToolScanner as unknown as Scanner);
-  registry.register(environmentIsolationAuditor as unknown as Scanner);
-  registry.register(mcpConfigAuditor as unknown as Scanner);
-  registry.register(permissionAnalyzer as unknown as Scanner);
-  registry.register(promptInjectionTester as unknown as Scanner);
-  registry.register(ragPoisoningScanner as unknown as Scanner);
-  registry.register(redTeamSimulator as unknown as Scanner);
-  registry.register(secretLeakScanner as unknown as Scanner);
-  registry.register(skillAuditor as unknown as Scanner);
-  registry.register(tetoraConfigAuditor as unknown as Scanner);
-  registry.register(mcpToolManifestScanner as unknown as Scanner);
-  registry.register(ideRuleInjectionScanner as unknown as Scanner);
-  registry.register(mcpToolShadowingDetector as unknown as Scanner);
-  registry.register(mcpToolResultInjectionScanner as unknown as Scanner);
-  registry.register(mcpGitCveScanner as unknown as Scanner);
-  registry.register(a2aSecurityScanner as unknown as Scanner);
-  registry.register(mcpSamplingAbuseScanner as unknown as Scanner);
-  registry.register(githubToxicFlowScanner as unknown as Scanner);
-  registry.register(mcpOAuthAuditor as unknown as Scanner);
+  // Module-based scanners
+  registry.register(agentConfigAuditor);
+  registry.register(channelSurfaceAuditor);
+  registry.register(clipboardExfiltrationScanner);
+  registry.register(defenseAnalyzer);
+  registry.register(dnsIcmpToolScanner);
+  registry.register(environmentIsolationAuditor);
+  registry.register(mcpConfigAuditor);
+  registry.register(permissionAnalyzer);
+  registry.register(promptInjectionTester);
+  registry.register(ragPoisoningScanner);
+  registry.register(redTeamSimulator);
+  registry.register(secretLeakScanner);
+  registry.register(skillAuditor);
+  registry.register(tetoraConfigAuditor);
+  registry.register(mcpToolManifestScanner);
+  registry.register(ideRuleInjectionScanner);
+  registry.register(mcpToolShadowingDetector);
+  registry.register(mcpToolResultInjectionScanner);
+  registry.register(mcpGitCveScanner);
+  registry.register(a2aSecurityScanner);
+  registry.register(mcpSamplingAbuseScanner);
+  registry.register(githubToxicFlowScanner);
+  registry.register(mcpOAuthAuditor);
 
   return registry;
 }

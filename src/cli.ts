@@ -6,7 +6,7 @@ import chalk from 'chalk';
 import { createDefaultRegistry } from './index';
 import { printReport, writeJsonReport, buildSarifReport, writeSarifReport } from './utils/reporter';
 import { calculateSummary } from './utils/scorer';
-import { ScannerModule } from './types';
+import { Scanner } from './types';
 import { loadSentoriConfig, SentoriConfig } from './config/sentori-config';
 import { customRulesScanner } from './scanners/custom-rules-scanner';
 import { applyConfig } from './utils/apply-config';
@@ -38,15 +38,15 @@ const MOBILE_SCANNERS = new Set([
 ]);
 
 /**
- * Filter a list of ScannerModules to only those relevant for a given profile.
+ * Filter scanners to only those relevant for a given profile.
  * - agent:   all scanners (full AI-agent security audit)
  * - general: secrets, permissions, skills
  * - mobile:  secrets, permissions only
  */
 export function filterScannersByProfile(
-  scanners: ScannerModule[],
+  scanners: Scanner[],
   profile: ProfileType
-): ScannerModule[] {
+): Scanner[] {
   if (profile === 'agent') return scanners;
   const allowlist = profile === 'mobile' ? MOBILE_SCANNERS : GENERAL_SCANNERS;
   return scanners.filter((s) => allowlist.has(s.name));
@@ -215,8 +215,8 @@ async function main(): Promise<void> {
 
   // Apply profile filter — must happen before runAll so skipped scanners are never loaded
   if (profile !== 'agent') {
-    const filtered = filterScannersByProfile(registry.getScanners() as import('./types').ScannerModule[], profile);
-    registry.setScanners(filtered as import('./types').Scanner[]);
+    const filtered = filterScannersByProfile(registry.getScanners(), profile);
+    registry.setScanners(filtered);
   }
 
   // Load .sentori.yml from target directory
@@ -243,7 +243,7 @@ async function main(): Promise<void> {
 
   // Register custom rules scanner if rules are defined
   if (sentoriConfig && sentoriConfig.rules.length > 0) {
-    registry.register(customRulesScanner(sentoriConfig.rules) as unknown as import('./types').Scanner);
+    registry.register(customRulesScanner(sentoriConfig.rules));
   }
 
   const scanOptions = {
