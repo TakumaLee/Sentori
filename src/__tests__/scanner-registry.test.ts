@@ -71,7 +71,8 @@ describe('ScannerRegistry.runAll', () => {
         return okResult('trigger');
       }),
     );
-    // Second scanner should be skipped (concurrency=1 guaranteed by sequential queue)
+    // Second scanner should be skipped — with 2 scanners, trigger's abort() runs
+    // synchronously before the next worker loop iteration checks signal.aborted
     registry.register(makeScanner('skipped', async () => okResult('skipped')));
 
     const report = await registry.runAll('/tmp/test', undefined, {

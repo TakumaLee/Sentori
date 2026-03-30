@@ -53,11 +53,13 @@ export class ScannerRegistry {
         const start = Date.now();
         try {
           const scanPromise = scanner.scan(targetDir, options);
-          const timeoutPromise = new Promise<null>((resolve) =>
-            setTimeout(() => resolve(null), timeout)
-          );
+          let timer: ReturnType<typeof setTimeout>;
+          const timeoutPromise = new Promise<null>((resolve) => {
+            timer = setTimeout(() => resolve(null), timeout);
+          });
 
           const result = await Promise.race([scanPromise, timeoutPromise]);
+          clearTimeout(timer!);
 
           if (result === null) {
             results[i] = {
