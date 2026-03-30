@@ -21,6 +21,8 @@ import {
   RedTeamReport,
   VariantResult,
 } from './runtime/cc-bos-red-team';
+import { runBenchmark } from './benchmark/runner';
+import { printBenchmarkReport, formatBenchmarkJson } from './benchmark/reporter';
 
 // ─── Profile filtering ──────────────────────────────────────────────────────
 
@@ -109,6 +111,18 @@ function printHelp(): void {
   console.log(chalk.cyan('    npx @nexylore/sentori scan ./my-agent --exclude "outputs/**"'));
   console.log(chalk.cyan('    npx @nexylore/sentori --discover'));
   console.log('');
+  console.log(chalk.bold('  Options (benchmark):'));
+  console.log(chalk.gray('    --model MODEL      LLM to benchmark (default: gpt-4o-mini)'));
+  console.log(chalk.gray('    --langs LANGS      Comma-separated language codes: zh,hi,pa,od,en (default: all)'));
+  console.log(chalk.gray('    --dry-run          Run with synthetic responses (no API calls)'));
+  console.log(chalk.gray('    --json             Output JSON report to stdout'));
+  console.log(chalk.gray('    --api-key KEY      API key (or set ANTHROPIC_API_KEY / OPENAI_API_KEY)'));
+  console.log('');
+  console.log(chalk.bold('  Examples (benchmark):'));
+  console.log(chalk.cyan('    npx @nexylore/sentori benchmark --model gpt-4o --langs zh,hi,pa,od'));
+  console.log(chalk.cyan('    npx @nexylore/sentori benchmark --model claude-haiku-4-5-20251001 --dry-run'));
+  console.log(chalk.cyan('    npx @nexylore/sentori benchmark --model gpt-4o --json'));
+  console.log('');
   console.log(chalk.bold('  Options (redteam):'));
   console.log(chalk.gray('    --attack cc-bos    Attack method (currently: cc-bos)'));
   console.log(chalk.gray('    --target PATH      Guardrail file path or label (required)'));
@@ -149,6 +163,12 @@ async function main(): Promise<void> {
   // ─── redteam subcommand ────────────────────────────────────────────────────
   if (args[0] === 'redteam') {
     await runRedTeam(args.slice(1));
+    process.exit(0);
+  }
+
+  // ─── benchmark subcommand ──────────────────────────────────────────────────
+  if (args[0] === 'benchmark') {
+    await runBenchmarkCmd(args.slice(1));
     process.exit(0);
   }
 
@@ -638,6 +658,45 @@ function printRedTeamReport(report: RedTeamReport): void {
   } else {
     console.log(chalk.bold.green('  ✓ All variants blocked. Guardrail appears robust.'));
     console.log('');
+  }
+}
+
+// ─── benchmark subcommand ─────────────────────────────────────────────────────
+
+async function runBenchmarkCmd(args: string[]): Promise<void> {
+  const model = getFlag(args, '--model') ?? 'gpt-4o-mini';
+  const langsRaw = getFlag(args, '--langs') ?? '';
+  const langs = langsRaw ? langsRaw.split(',').map((l) => l.trim()).filter(Boolean) : [];
+  const dryRun = args.includes('--dry-run');
+  const jsonOutput = args.includes('--json');
+  const apiKey = getFlag(args, '--api-key');
+
+  if (!jsonOutput) {
+    console.log('');
+    console.log(chalk.bold.cyan('  🛡️  Sentori Benchmark'));
+    console.log(chalk.gray(`  Model: ${model}`));
+    if (langs.length > 0) console.log(chalk.gray(`  Langs: ${langs.join(', ')}`));
+    if (dryRun) console.log(chalk.gray('  Mode:  dry-run'));
+    console.log('');
+  }
+
+  const report = await runBenchmark(
+    { model, langs, dryRun, apiKey },
+    (done, total, promptId) => {
+      if (jsonOutput) return;
+      const pct = Math.round((done / total) * 100);
+      const filled = Math.round((done / total) * 20);
+      const bar = chalk.green('█'.repeat(filled)) + chalk.gray('░'.repeat(20 - filled));
+      process.stdout.write(`\r  ${bar} ${pct}% · ${promptId}   `);
+    }
+  );
+
+  if (!jsonOutput) process.stdout.write('\n');
+
+  if (jsonOutput) {
+    console.log(formatBenchmarkJson(report));
+  } else {
+    printBenchmarkReport(report);
   }
 }
 
