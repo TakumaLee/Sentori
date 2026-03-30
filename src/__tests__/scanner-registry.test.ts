@@ -3,7 +3,7 @@
  */
 
 import { ScannerRegistry } from '../scanner-registry';
-import type { Scanner, ScanResult } from '../types';
+import type { Scanner, ScanResult, ScannerOptions } from '../types';
 
 // ---------------------------------------------------------------------------
 // Helpers
