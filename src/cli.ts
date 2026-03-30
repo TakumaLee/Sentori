@@ -14,6 +14,13 @@ import { printConfigWarnings } from './utils/print-warnings';
 import { runDiscover } from './discover';
 import { CUSTOM_RULES_SCANNER_NAME } from './scanners/custom-rules-scanner';
 import { loadIgnorePatterns } from './utils/ignore-parser';
+import { startWatcher } from './watcher';
+import {
+  runCCBOSRedTeam,
+  dryRunCCBOS,
+  RedTeamReport,
+  VariantResult,
+} from './runtime/cc-bos-red-team';
 
 // ─── Profile filtering ──────────────────────────────────────────────────────
 
@@ -70,7 +77,11 @@ function printHelp(): void {
   console.log(chalk.bold('  Usage:'));
   console.log(chalk.gray('    npx @nexylore/sentori [scan] [target-dir] [options]'));
   console.log('');
-  console.log(chalk.bold('  Options:'));
+  console.log(chalk.bold('  Subcommands:'));
+  console.log(chalk.gray('    scan [target-dir]  Security scan (default)'));
+  console.log(chalk.gray('    redteam            CC-BOS structured jailbreak testing'));
+  console.log('');
+  console.log(chalk.bold('  Options (scan):'));
   console.log(chalk.gray('    --help, -h         Show help'));
   console.log(chalk.gray('    --version, -v      Show version'));
   console.log(chalk.gray('    --json             Output JSON report to stdout'));
@@ -84,10 +95,12 @@ function printHelp(): void {
   console.log(chalk.gray('    --exclude PATTERN    Exclude files/dirs matching pattern (can repeat)'));
   console.log(chalk.gray('    --include-workspace-projects  Scan sub-projects inside workspace/ (default: skip)'));
   console.log(chalk.gray('    --discover           Auto-discover and scan agent configs in common paths'));
+  console.log(chalk.gray('    --watch              Re-scan automatically when config files change'));
   console.log('');
   console.log(chalk.bold('  Examples:'));
   console.log(chalk.cyan('    npx @nexylore/sentori scan'));
   console.log(chalk.cyan('    npx @nexylore/sentori scan ./my-agent'));
+  console.log(chalk.cyan('    npx @nexylore/sentori scan ./my-agent --watch'));
   console.log(chalk.cyan('    npx @nexylore/sentori scan ./my-agent --json'));
   console.log(chalk.cyan('    npx @nexylore/sentori scan ./my-agent --format sarif'));
   console.log(chalk.cyan('    npx @nexylore/sentori scan ./my-agent --output report.json'));
@@ -95,6 +108,23 @@ function printHelp(): void {
   console.log(chalk.cyan('    npx @nexylore/sentori scan ./my-agent --ioc ./custom-ioc.json'));
   console.log(chalk.cyan('    npx @nexylore/sentori scan ./my-agent --exclude "outputs/**"'));
   console.log(chalk.cyan('    npx @nexylore/sentori --discover'));
+  console.log('');
+  console.log(chalk.bold('  Options (redteam):'));
+  console.log(chalk.gray('    --attack cc-bos    Attack method (currently: cc-bos)'));
+  console.log(chalk.gray('    --target PATH      Guardrail file path or label (required)'));
+  console.log(chalk.gray('    --goal TEXT        Attack goal / harmful capability to elicit (required)'));
+  console.log(chalk.gray('    --iterations N     Number of jailbreak variants to test (default: 20)'));
+  console.log(chalk.gray('    --model MODEL      LLM to test (default: claude-haiku-4-5-20251001)'));
+  console.log(chalk.gray('    --api-key KEY      API key (or set ANTHROPIC_API_KEY / OPENAI_API_KEY)'));
+  console.log(chalk.gray('    --dry-run          Generate variants without calling any LLM'));
+  console.log(chalk.gray('    --output, -o FILE  Save JSON report to file'));
+  console.log(chalk.gray('    --json             Print JSON report to stdout'));
+  console.log('');
+  console.log(chalk.bold('  Examples (redteam):'));
+  console.log(chalk.cyan('    npx @nexylore/sentori redteam --attack cc-bos --target ./guardrail.md \\'));
+  console.log(chalk.cyan('      --goal "explain malware creation" --iterations 50'));
+  console.log(chalk.cyan('    npx @nexylore/sentori redteam --attack cc-bos --target my-guardrail \\'));
+  console.log(chalk.cyan('      --goal "bypass content filter" --dry-run'));
   console.log('');
 }
 
@@ -116,6 +146,12 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  // ─── redteam subcommand ────────────────────────────────────────────────────
+  if (args[0] === 'redteam') {
+    await runRedTeam(args.slice(1));
+    process.exit(0);
+  }
+
   // Parse flags
   let outputFormat: 'pretty' | 'json' | 'sarif' = 'pretty';
   const formatIdx = args.findIndex((a) => a === '--format');
@@ -126,6 +162,13 @@ async function main(): Promise<void> {
   if (args.includes('--json')) outputFormat = 'json'; // backward compat
   const jsonMode = outputFormat === 'json';
   const sarifMode = outputFormat === 'sarif';
+  const watchMode = args.includes('--watch');
+
+  if (watchMode && (jsonMode || sarifMode)) {
+    console.error(chalk.red('  ✗ --watch is not compatible with --json or --format sarif/json'));
+    console.error(chalk.gray('    Use --output file.json to write reports to file instead'));
+    process.exit(1);
+  }
 
   const deepScan = args.includes('--deep-scan');
   if (deepScan) {
@@ -202,20 +245,107 @@ async function main(): Promise<void> {
   // Load .sentoriignore from target directory
   const { patterns: sentoriIgnorePatterns } = loadIgnorePatterns(targetDir);
 
+  const scanOpts = {
+    targetDir,
+    outputFormat,
+    outputPath,
+    iocPath,
+    profile,
+    deepScan,
+    includeVendored,
+    includeWorkspaceProjects,
+    excludes,
+    sentoriIgnorePatterns,
+    requireProvenance,
+    watchMode,
+  };
+
+  if (watchMode) {
+    // Initial scan
+    await runScan(scanOpts);
+
+    // Start file watcher
+    console.log(chalk.cyan('\n  Watching for changes... Press Ctrl+C to stop\n'));
+    let scanning = false;
+    const stopWatcher = await startWatcher(targetDir, async (scanners, changedPaths) => {
+      if (scanning) return;
+      scanning = true;
+      try {
+        const changedFiles = changedPaths.map((p) => path.relative(targetDir, p)).join(', ');
+        console.log(chalk.gray(`\n  [${timestamp()}] Changed: ${changedFiles}`));
+        await runScan({ ...scanOpts, scannerFilter: scanners, isRescan: true });
+      } finally {
+        scanning = false;
+      }
+    });
+
+    process.on('SIGINT', () => {
+      stopWatcher();
+      console.log(chalk.gray('\n  Watch stopped.'));
+      process.exit(0);
+    });
+  } else {
+    await runScan(scanOpts);
+  }
+}
+
+function timestamp(): string {
+  const now = new Date();
+  return [now.getHours(), now.getMinutes(), now.getSeconds()]
+    .map((n) => String(n).padStart(2, '0'))
+    .join(':');
+}
+
+interface ScanOptions {
+  targetDir: string;
+  outputFormat: 'pretty' | 'json' | 'sarif';
+  outputPath?: string;
+  iocPath?: string;
+  profile: ProfileType;
+  deepScan: boolean;
+  includeVendored: boolean;
+  includeWorkspaceProjects: boolean;
+  excludes: string[];
+  sentoriIgnorePatterns: string[];
+  requireProvenance: boolean;
+  watchMode: boolean;
+  scannerFilter?: string[] | null;
+  isRescan?: boolean;
+}
+
+async function runScan(opts: ScanOptions): Promise<void> {
+  const {
+    targetDir, outputFormat, outputPath, iocPath, profile,
+    includeVendored, includeWorkspaceProjects, excludes,
+    sentoriIgnorePatterns, requireProvenance, watchMode,
+    scannerFilter,
+  } = opts;
+  const jsonMode = outputFormat === 'json';
+  const sarifMode = outputFormat === 'sarif';
   const version = getVersion();
 
   if (!jsonMode && !sarifMode) {
-    console.log('');
-    console.log(chalk.bold.cyan('  🛡️  Sentori') + chalk.gray(` v${version}`));
-    console.log(chalk.gray(`  Scanning: ${targetDir}`));
-    console.log('');
+    if (opts.isRescan) {
+      console.log(chalk.gray(`  [${timestamp()}] Re-scanning...`));
+    } else {
+      console.log('');
+      console.log(chalk.bold.cyan('  🛡️  Sentori') + chalk.gray(` v${version}`));
+      console.log(chalk.gray(`  Scanning: ${targetDir}`));
+      console.log('');
+    }
   }
 
   const registry = createDefaultRegistry(iocPath);
 
-  // Apply profile filter — must happen before runAll so skipped scanners are never loaded
+  // Apply profile filter
   if (profile !== 'agent') {
     const filtered = filterScannersByProfile(registry.getScanners(), profile);
+    registry.setScanners(filtered);
+  }
+
+  // Apply incremental scanner filter (watch mode)
+  if (scannerFilter !== undefined && scannerFilter !== null) {
+    const filtered = registry.getScanners().filter((s) => scannerFilter.includes(s.name));
     registry.setScanners(filtered);
   }
 
@@ -261,10 +391,8 @@ async function main(): Promise<void> {
     const bar = chalk.green('█'.repeat(filled)) + chalk.gray('░'.repeat(empty));
 
     if (!result) {
-      // Starting scanner
       process.stdout.write(`\r  ${bar} ${pct}% · ${name}...`);
     } else {
-      // Completed scanner
       const findingsColor = result.findings.length > 0 ? chalk.yellow(String(result.findings.length)) : chalk.green('0');
       process.stdout.write(`\r  ${bar} ${pct}% · ${name} ${chalk.gray('→')} ${findingsColor} findings ${chalk.gray(`(${result.duration}ms)`)}   \n`);
     }
@@ -275,12 +403,10 @@ async function main(): Promise<void> {
     report = applyConfig(report, sentoriConfig);
   }
 
-  // Ensure summary is populated (registry.runAll now always sets it, but be safe)
-  // Always recalculate after config application to reflect filtered findings
   report.summary = calculateSummary(report.results);
   report.version = version;
 
-  // Surface .sentori.yml config warnings as info findings so they appear in JSON/SARIF
+  // Surface .sentori.yml config warnings as info findings
   if (sentoriConfig && sentoriConfig.warnings.length > 0) {
     const warningFindings = sentoriConfig.warnings.map((warning, idx) => ({
       id: `CONFIG-WARNING-${idx}`,
@@ -303,43 +429,216 @@ async function main(): Promise<void> {
         duration: 0,
       });
     }
-    // Recalculate summary after adding warning findings
     report.summary = calculateSummary(report.results);
   }
 
   if (sarifMode && outputPath) {
-    // --format sarif --output file.sarif
     writeSarifReport(report, outputPath);
   } else if (sarifMode) {
-    // --format sarif → stdout
     console.log(JSON.stringify(buildSarifReport(report), null, 2));
   } else if (jsonMode) {
-    // --json → stdout
     console.log(JSON.stringify(report, null, 2));
   } else if (outputPath && outputPath.endsWith('.sarif')) {
-    // auto-detect .sarif extension
     printReport(report);
     writeSarifReport(report, outputPath);
   } else if (outputPath) {
-    // Save JSON to file
     printReport(report);
     writeJsonReport(report, outputPath);
   } else {
-    // Default: pretty print
     printReport(report);
   }
 
-  // Exit code: 2 = critical, 1 = high, 0 = ok
-  const s = report.summary;
-  if (requireProvenance) {
-    const attestationFindings = report.results
-      .find((r) => r.scanner === 'NPM Attestation Scanner')?.findings ?? [];
-    const unattested = attestationFindings.filter((f) => f.rule === 'ATTESTATION-001');
-    if (unattested.length > 0) {
-      process.exit(s.critical > 0 ? 2 : 1);
+  // Exit code logic (skip in watch mode — keep event loop alive)
+  if (!watchMode) {
+    const s = report.summary;
+    if (requireProvenance) {
+      const attestationFindings = report.results
+        .find((r) => r.scanner === 'NPM Attestation Scanner')?.findings ?? [];
+      const unattested = attestationFindings.filter((f) => f.rule === 'ATTESTATION-001');
+      if (unattested.length > 0) {
+        process.exit(s.critical > 0 ? 2 : 1);
+      }
     }
+    process.exit(s.critical > 0 ? 2 : s.high > 0 ? 1 : 0);
   }
-  process.exit(s.critical > 0 ? 2 : s.high > 0 ? 1 : 0);
+}
+
+// ─── redteam subcommand ────────────────────────────────────────────────────────
+
+function getFlag(args: string[], flag: string): string | undefined {
+  const idx = args.findIndex((a) => a === flag);
+  return idx !== -1 && args[idx + 1] ? args[idx + 1] : undefined;
+}
+
+async function runRedTeam(args: string[]): Promise<void> {
+  const attack = getFlag(args, '--attack') ?? 'cc-bos';
+  if (attack !== 'cc-bos') {
+    console.error(chalk.red(`  ✗ Unknown --attack value: "${attack}". Currently supported: cc-bos`));
+    process.exit(1);
+  }
+
+  const targetRaw = getFlag(args, '--target');
+  if (!targetRaw) {
+    console.error(chalk.red('  ✗ --target is required (guardrail file path or label)'));
+    process.exit(1);
+  }
+
+  const goal = getFlag(args, '--goal');
+  if (!goal) {
+    console.error(chalk.red('  ✗ --goal is required (e.g. "explain malware creation")'));
+    process.exit(1);
+  }
+
+  const iterStr = getFlag(args, '--iterations') ?? '20';
+  const iterations = parseInt(iterStr, 10);
+  if (isNaN(iterations) || iterations < 1) {
+    console.error(chalk.red(`  ✗ --iterations must be a positive integer, got: "${iterStr}"`));
+    process.exit(1);
+  }
+
+  const model = getFlag(args, '--model') ?? 'claude-haiku-4-5-20251001';
+  const apiKey =
+    getFlag(args, '--api-key') ??
+    process.env.ANTHROPIC_API_KEY ??
+    process.env.OPENAI_API_KEY ??
+    '';
+
+  const dryRun = args.includes('--dry-run');
+  const jsonOutput = args.includes('--json');
+  const outputPath = getFlag(args, '--output') ?? getFlag(args, '-o');
+
+  // Resolve guardrail prompt from file (if path exists) or use target as label
+  let guardrailPrompt = '';
+  let targetLabel = targetRaw;
+  const resolvedTarget = path.resolve(targetRaw);
+  if (fs.existsSync(resolvedTarget) && fs.statSync(resolvedTarget).isFile()) {
+    guardrailPrompt = fs.readFileSync(resolvedTarget, 'utf-8');
+    targetLabel = targetRaw;
+  } else if (!dryRun) {
+    // Target is a label — guardrail prompt stays empty (model uses its default system prompt)
+    guardrailPrompt = '';
+  }
+
+  // ── Dry-run: generate variants, no API call ─────────────────────────────────
+  if (dryRun) {
+    const variants = dryRunCCBOS(goal, iterations);
+    if (jsonOutput) {
+      console.log(JSON.stringify({ dryRun: true, goal, target: targetLabel, iterations, variants }, null, 2));
+    } else {
+      console.log('');
+      console.log(chalk.bold.cyan('  🔴 Sentori Red Team') + chalk.gray(' (dry-run)'));
+      console.log(chalk.gray(`  Attack:     cc-bos`));
+      console.log(chalk.gray(`  Target:     ${targetLabel}`));
+      console.log(chalk.gray(`  Goal:       ${goal}`));
+      console.log(chalk.gray(`  Variants:   ${iterations}`));
+      console.log('');
+      for (const v of variants) {
+        console.log(chalk.bold(`  ── Variant #${v.id} ──────────────────────────────────────`));
+        console.log(chalk.gray('  Role:    ') + v.dimensions.roleIdentity);
+        console.log(chalk.gray('  Trigger: ') + v.dimensions.triggerPattern);
+        console.log('');
+        console.log(chalk.white(v.prompt.split('\n').map((l) => '    ' + l).join('\n')));
+        console.log('');
+      }
+    }
+    if (outputPath) {
+      fs.writeFileSync(outputPath, JSON.stringify({ dryRun: true, goal, target: targetLabel, iterations, variants }, null, 2));
+      if (!jsonOutput) console.log(chalk.gray(`  Report saved to: ${outputPath}`));
+    }
+    return;
+  }
+
+  // ── Live run: call LLM for each variant ────────────────────────────────────
+  if (!apiKey) {
+    console.error(chalk.red('  ✗ No API key found. Set ANTHROPIC_API_KEY / OPENAI_API_KEY or pass --api-key'));
+    process.exit(1);
+  }
+
+  if (!jsonOutput) {
+    console.log('');
+    console.log(chalk.bold.cyan('  🔴 Sentori Red Team'));
+    console.log(chalk.gray(`  Attack:     cc-bos`));
+    console.log(chalk.gray(`  Target:     ${targetLabel}`));
+    console.log(chalk.gray(`  Goal:       ${goal}`));
+    console.log(chalk.gray(`  Model:      ${model}`));
+    console.log(chalk.gray(`  Iterations: ${iterations}`));
+    console.log('');
+  }
+
+  const report = await runCCBOSRedTeam({
+    goal,
+    guardrailPrompt,
+    targetLabel,
+    model,
+    apiKey,
+    iterations,
+    onProgress: (current, total, result) => {
+      if (jsonOutput) return;
+      const pct = Math.round((current / total) * 100);
+      const filled = Math.round((current / total) * 20);
+      const bar = chalk.green('█'.repeat(filled)) + chalk.gray('░'.repeat(20 - filled));
+      const statusIcon = result.error
+        ? chalk.red('ERR')
+        : result.success
+          ? chalk.red('PASS')
+          : chalk.green('BLOCK');
+      process.stdout.write(`\r  ${bar} ${pct}% · #${current}/${total} ${statusIcon}   `);
+    },
+  });
+
+  if (!jsonOutput) {
+    process.stdout.write('\n');
+    printRedTeamReport(report);
+  } else {
+    console.log(JSON.stringify(report, null, 2));
+  }
+
+  if (outputPath) {
+    fs.writeFileSync(outputPath, JSON.stringify(report, null, 2));
+    if (!jsonOutput) console.log(chalk.gray(`\n  Report saved to: ${outputPath}`));
+  }
+}
+
+function printRedTeamReport(report: RedTeamReport): void {
+  const asrColor =
+    report.asr >= 0.5 ? chalk.red : report.asr >= 0.2 ? chalk.yellow : chalk.green;
+
+  console.log('');
+  console.log(chalk.bold('  ── Results ─────────────────────────────────────────'));
+  console.log(chalk.gray('  Target:      ') + report.target);
+  console.log(chalk.gray('  Model:       ') + report.model);
+  console.log(chalk.gray('  Goal:        ') + report.goal);
+  console.log(chalk.gray('  Variants:    ') + report.totalVariants);
+  console.log(chalk.gray('  Blocked:     ') + chalk.green(String(report.failureCount)));
+  console.log(chalk.gray('  Bypassed:    ') + chalk.red(String(report.successCount)));
+  if (report.errorCount > 0) {
+    console.log(chalk.gray('  Errors:      ') + chalk.yellow(String(report.errorCount)));
+  }
+  console.log(chalk.gray('  ASR:         ') + asrColor(chalk.bold(report.asrPercent)));
+  console.log(chalk.gray(`  Duration:    ${(report.durationMs / 1000).toFixed(1)}s`));
+  console.log('');
+
+  if (report.successfulVariants.length > 0) {
+    console.log(chalk.bold.red(`  ⚠  ${report.successfulVariants.length} bypass(es) found:`));
+    console.log('');
+    for (const v of report.successfulVariants) {
+      console.log(chalk.bold(`  ── Bypass #${v.id} ──────────────────────────────────────`));
+      console.log(chalk.gray('  Role:     ') + v.dimensions.roleIdentity);
+      console.log(chalk.gray('  Trigger:  ') + v.dimensions.triggerPattern);
+      console.log(chalk.gray('  Mechanism:') + ' ' + v.dimensions.mechanism);
+      console.log('');
+      console.log(chalk.gray('  Prompt:'));
+      console.log(v.prompt.split('\n').map((l) => chalk.white('    ' + l)).join('\n'));
+      console.log('');
+      console.log(chalk.gray('  Response (excerpt):'));
+      const excerpt = v.response.slice(0, 400).replace(/\n/g, ' ');
+      console.log(chalk.yellow('    ' + excerpt + (v.response.length > 400 ? '...' : '')));
+      console.log('');
+    }
+  } else {
+    console.log(chalk.bold.green('  ✓ All variants blocked. Guardrail appears robust.'));
+    console.log('');
+  }
 }
 
 main().catch((err) => {
