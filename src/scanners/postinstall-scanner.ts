@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { Scanner, ScanResult, Finding, Severity } from '../types';
+import { Scanner, ScannerOptions, ScanResult, Finding, Severity } from '../types';
 
 // --- Suspicious pattern definitions ---
 
@@ -47,7 +47,7 @@ export class PostinstallScanner implements Scanner {
     this.depth = config?.depth ?? 1;
   }
 
-  async scan(targetDir: string): Promise<ScanResult> {
+  async scan(targetDir: string, _options?: ScannerOptions): Promise<ScanResult> {
     const start = Date.now();
     const findings: Finding[] = [];
     let scannedPackages = 0;

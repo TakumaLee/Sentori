@@ -35,6 +35,8 @@ export interface ScanResult {
   scannedFiles?: number;
   filesScanned?: number;
   duration: number; // ms
+  /** Present when the scanner timed out, was aborted, or threw an error */
+  error?: string;
 }
 
 export interface ScanReport {
@@ -84,20 +86,23 @@ export interface ScannerOptions {
   sentoriIgnorePatterns?: string[];
   /** When true, scan sub-projects inside workspace/ directories. Default: false. */
   includeWorkspaceProjects?: boolean;
+  /** Per-scanner timeout in milliseconds. Default: 30000 */
+  timeout?: number;
+  /** AbortSignal to cancel remaining scanners */
+  signal?: AbortSignal;
 }
 
-export interface ScannerModule {
-  name: string;
-  description: string;
-  scan(targetPath: string, options?: ScannerOptions): Promise<ScanResult>;
-}
-
-/** Legacy scanner interface (class-based, single-arg scan) */
+/** Unified scanner interface — covers both class-based and module-based scanners. */
 export interface Scanner {
   name: string;
   description: string;
-  scan(targetDir: string): Promise<ScanResult>;
+  scan(targetDir: string, options?: ScannerOptions): Promise<ScanResult>;
 }
+
+/**
+ * @deprecated Use Scanner directly. Kept as a type alias for backward compatibility.
+ */
+export type ScannerModule = Scanner;
 
 export interface McpServerConfig {
   mcpServers?: Record<string, McpServerEntry>;
