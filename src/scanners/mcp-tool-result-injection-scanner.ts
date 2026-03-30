@@ -405,7 +405,7 @@ export function scanFixtureObject(
           title: `Tool result injection payload detected in fixture data`,
           description: `${description} — found in field "${keyPath}"`,
           file: filePath,
-          evidence: value.length > 200 ? `...${value.slice(Math.max(0, value.indexOf(match[0]) - 40), value.indexOf(match[0]) + 120)}...` : value,
+          evidence: value.length > 200 ? `...${value.slice(Math.max(0, value.indexOf(match[0]) - 40), Math.min(value.length, value.indexOf(match[0]) + 120))}...` : value,
           recommendation: 'Sanitize or validate tool return values before inserting them into the LLM context. Apply content policy filtering on all external data sources.',
           confidence: 'definite',
         });
