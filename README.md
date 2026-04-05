@@ -1,8 +1,14 @@
-# Sentori
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./assets/banner-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="./assets/banner-light.png">
+    <img alt="Sentori — AI Agent Security Scanner" src="./assets/banner-light.png" width="600">
+  </picture>
+</p>
 
-![Sentori](./assets/logo.png)
-
-> **AI Agent Security Scanner — 守るべきものを、守る。**
+<p align="center">
+  <strong>守るべきものを、守る。</strong>
+</p>
 
 [![npm version](https://img.shields.io/npm/v/@nexylore/sentori.svg)](https://www.npmjs.com/package/@nexylore/sentori)
 [![license](https://img.shields.io/badge/license-BSL--1.1-blue.svg)](./LICENSE)
