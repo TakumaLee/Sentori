@@ -90,6 +90,8 @@ export interface ScannerOptions {
   timeout?: number;
   /** AbortSignal to cancel remaining scanners */
   signal?: AbortSignal;
+  /** Maximum number of scanners to run in parallel. Default: Math.min(5, os.cpus().length) */
+  concurrency?: number;
 }
 
 /** Unified scanner interface — covers both class-based and module-based scanners. */

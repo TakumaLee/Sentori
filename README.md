@@ -243,6 +243,25 @@ When using `--json` or `--output`, the report includes:
 | `fail-on-critical` | Fail workflow on critical findings | `true` |
 | `output-format` | Output format (`text` or `json`) | `text` |
 
+### Concurrency Tuning
+
+Sentori runs scanners in parallel. The default concurrency is `Math.min(5, cpu_count)`. On constrained CI runners (e.g. GitHub Actions 2-core), reduce it to avoid OOM with OCR + regex-heavy scanners:
+
+| Environment | Recommended `--concurrency` |
+|-------------|----------------------------|
+| GitHub Actions (2-core runner) | `2` |
+| Local development | `5` (default) |
+
+**Via CLI flag:**
+```bash
+npx @nexylore/sentori scan --concurrency 2
+```
+
+**Via environment variable:**
+```bash
+SENTORI_CONCURRENCY=2 npx @nexylore/sentori scan
+```
+
 ---
 
 ## 🛡️ Security Badge

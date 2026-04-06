@@ -1,3 +1,4 @@
+import * as os from 'os';
 import { Scanner, ScannerOptions, ScanReport, ScanResult } from './types';
 import { calculateSummary } from './utils/scorer';
 
@@ -25,8 +26,10 @@ export class ScannerRegistry {
     const timeout = options?.timeout ?? DEFAULT_SCANNER_TIMEOUT_MS;
     const signal = options?.signal;
 
-    // Run scanners in parallel with concurrency limit of 5
-    const CONCURRENCY = 5;
+    // Run scanners in parallel with configurable concurrency.
+    // Priority: options.concurrency > SENTORI_CONCURRENCY env var > Math.min(5, os.cpus().length)
+    const envConcurrency = process.env.SENTORI_CONCURRENCY ? parseInt(process.env.SENTORI_CONCURRENCY, 10) : NaN;
+    const CONCURRENCY = options?.concurrency ?? (Number.isFinite(envConcurrency) && envConcurrency > 0 ? envConcurrency : Math.min(5, os.cpus().length));
     let nextIndex = 0;
     let completedCount = 0;
 
