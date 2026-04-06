@@ -52,7 +52,8 @@ describe('ScannerRegistry.runAll', () => {
 
     // slow scanner should have timed out
     const slowResult = report.results.find((r) => r.scanner === 'slow')!;
-    expect(slowResult.error).toMatch(/timeout/);
+    expect(slowResult.error?.type).toBe('TimeoutError');
+    expect(slowResult.error?.message).toMatch(/timeout/);
     expect(slowResult.findings).toEqual([]);
 
     // fast scanner should have succeeded
@@ -84,7 +85,8 @@ describe('ScannerRegistry.runAll', () => {
     expect(report.results[0].error).toBeUndefined();
 
     expect(report.results[1].scanner).toBe('skipped');
-    expect(report.results[1].error).toBe('aborted');
+    expect(report.results[1].error?.type).toBe('LogicError');
+    expect(report.results[1].error?.message).toBe('aborted');
   });
 
   it('catches scanner exceptions and records them as errors', async () => {
@@ -99,7 +101,8 @@ describe('ScannerRegistry.runAll', () => {
     const report = await registry.runAll('/tmp/test', undefined, {});
 
     const boomResult = report.results.find((r) => r.scanner === 'boom')!;
-    expect(boomResult.error).toMatch(/scanner crashed/);
+    expect(boomResult.error?.type).toBe('LogicError');
+    expect(boomResult.error?.message).toMatch(/scanner crashed/);
     expect(boomResult.findings).toEqual([]);
 
     const okResultEntry = report.results.find((r) => r.scanner === 'ok')!;
