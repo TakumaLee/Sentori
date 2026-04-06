@@ -67,12 +67,15 @@ export function loadIOC(externalPath?: string): IOCBlocklist {
   const base: IOCBlocklist = { ...defaultIOC };
   if (externalPath && fs.existsSync(externalPath)) {
     try {
-      const ext: IOCBlocklist = JSON.parse(fs.readFileSync(externalPath, 'utf-8'));
-      if (ext.malicious_ips) {
-        base.malicious_ips = [...new Set([...base.malicious_ips, ...ext.malicious_ips])];
-      }
-      if (ext.malicious_domains) {
-        base.malicious_domains = [...new Set([...base.malicious_domains, ...ext.malicious_domains])];
+      const extRaw: unknown = JSON.parse(fs.readFileSync(externalPath, 'utf-8'));
+      if (typeof extRaw === 'object' && extRaw !== null) {
+        const ext = extRaw as Record<string, unknown>;
+        if (Array.isArray(ext.malicious_ips)) {
+          base.malicious_ips = [...new Set([...base.malicious_ips, ...(ext.malicious_ips as string[])])];
+        }
+        if (Array.isArray(ext.malicious_domains)) {
+          base.malicious_domains = [...new Set([...base.malicious_domains, ...(ext.malicious_domains as string[])])];
+        }
       }
     } catch (err) {
       process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'SupplyChainScanner', file: externalPath, error: 'External IOC blocklist JSON parse failed — using defaults', message: String(err) }) + '\n');

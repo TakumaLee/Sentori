@@ -587,8 +587,8 @@ export function loadAgentConfig(targetDir: string): AgentConfig {
       }
       const result = AgentConfigSchema.safeParse(raw);
       if (!result.success) {
-        process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'HygieneAuditor', file: p, error: 'agent config schema validation failed — returning raw', issues: result.error.issues }) + '\n');
-        return raw as AgentConfig;
+        process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'HygieneAuditor', file: p, error: 'agent config schema validation failed — returning empty config', issues: result.error.issues }) + '\n');
+        return {};
       }
       return result.data as AgentConfig;
     }

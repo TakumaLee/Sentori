@@ -1,6 +1,7 @@
 import * as https from 'node:https';
 import * as http from 'node:http';
 import * as fs from 'node:fs';
+import { z } from 'zod';
 import { ScannerModule, ScanResult, Finding, ScannerOptions } from '../types';
 
 /**
@@ -51,6 +52,33 @@ interface A2ASkill {
   tags?: string[];
   [key: string]: unknown;
 }
+
+// ─── Zod schema for runtime validation of A2AAgentCard ───────────────────────
+
+const A2AAgentCardSchema = z.object({
+  name: z.string().optional(),
+  url: z.string().optional(),
+  version: z.string().optional(),
+  capabilities: z.object({
+    streaming: z.boolean().optional(),
+    pushNotifications: z.boolean().optional(),
+    stateTransitionHistory: z.boolean().optional(),
+  }).passthrough().optional(),
+  authentication: z.union([
+    z.null(),
+    z.object({ schemes: z.array(z.string()).optional(), credentials: z.unknown().optional() }).passthrough(),
+    z.array(z.object({ schemes: z.array(z.string()).optional(), credentials: z.unknown().optional() }).passthrough()),
+  ]).optional(),
+  defaultInputModes: z.array(z.string()).optional(),
+  defaultOutputModes: z.array(z.string()).optional(),
+  skills: z.array(z.object({
+    id: z.string().optional(),
+    name: z.string().optional(),
+    inputModes: z.array(z.string()).optional(),
+    outputModes: z.array(z.string()).optional(),
+    tags: z.array(z.string()).optional(),
+  }).passthrough()).optional(),
+}).passthrough();
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -130,14 +158,19 @@ async function resolveAgentCard(input: string): Promise<{ card: A2AAgentCard; so
   const isFilePath = input.startsWith('/') || input.startsWith('./') || input.startsWith('../');
   if (isFilePath || fs.existsSync(input)) {
     const raw = fs.readFileSync(input, 'utf8');
-    let card: A2AAgentCard;
+    let parsed: unknown;
     try {
-      card = JSON.parse(raw) as A2AAgentCard;
+      parsed = JSON.parse(raw);
     } catch (err) {
       process.stderr.write(JSON.stringify({ level: 'error', scanner: 'A2ASecurityScanner', source: input, error: 'JSON parse failed', message: String(err) }) + '\n');
       throw new Error(`Invalid JSON in agent card file "${input}": ${String(err)}`);
     }
-    return { card, source: input, isHttp: false };
+    const result = A2AAgentCardSchema.safeParse(parsed);
+    if (!result.success) {
+      process.stderr.write(JSON.stringify({ level: 'error', scanner: 'A2ASecurityScanner', source: input, error: 'Agent card schema validation failed', issues: result.error.issues }) + '\n');
+      throw new Error(`Invalid agent card structure in "${input}": schema validation failed`);
+    }
+    return { card: result.data as A2AAgentCard, source: input, isHttp: false };
   }
 
   // URL: normalize
@@ -151,14 +184,19 @@ async function resolveAgentCard(input: string): Promise<{ card: A2AAgentCard; so
   }
 
   const raw = await fetchUrl(url);
-  let card: A2AAgentCard;
+  let parsed: unknown;
   try {
-    card = JSON.parse(raw) as A2AAgentCard;
+    parsed = JSON.parse(raw);
   } catch (err) {
     process.stderr.write(JSON.stringify({ level: 'error', scanner: 'A2ASecurityScanner', source: url, error: 'JSON parse failed', message: String(err) }) + '\n');
     throw new Error(`Invalid JSON in agent card response from "${url}": ${String(err)}`);
   }
-  return { card, source: url, isHttp: url.startsWith('http://') };
+  const result = A2AAgentCardSchema.safeParse(parsed);
+  if (!result.success) {
+    process.stderr.write(JSON.stringify({ level: 'error', scanner: 'A2ASecurityScanner', source: url, error: 'Agent card schema validation failed', issues: result.error.issues }) + '\n');
+    throw new Error(`Invalid agent card structure from "${url}": schema validation failed`);
+  }
+  return { card: result.data as A2AAgentCard, source: url, isHttp: url.startsWith('http://') };
 }
 
 // ─── Audit functions ──────────────────────────────────────────────────────────

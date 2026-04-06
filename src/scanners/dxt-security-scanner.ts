@@ -104,17 +104,26 @@ export class DxtSecurityScanner implements Scanner {
     const configFiles = this.findDxtConfigs(targetDir);
 
     for (const file of configFiles) {
+      let content: string;
       try {
-        const content = fs.readFileSync(file, 'utf-8');
-        const parsed = JSON.parse(content);
-        const extensions = this.extractExtensions(parsed);
-        const relPath = path.relative(targetDir, file);
-
-        for (const [extName, ext] of extensions) {
-          findings.push(...this.auditExtension(extName, ext, relPath));
-        }
+        content = fs.readFileSync(file, 'utf-8');
       } catch (err) {
-        process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'DxtSecurityScanner', file, error: 'JSON parse failed — skipping', message: String(err) }) + '\n');
+        process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'DxtSecurityScanner', file, error: 'Failed to read DXT config file — skipping', message: String(err) }) + '\n');
+        continue;
+      }
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(content);
+      } catch (err) {
+        process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'DxtSecurityScanner', file, error: 'DXT config JSON parse failed — skipping', message: String(err) }) + '\n');
+        continue;
+      }
+
+      const extensions = this.extractExtensions(parsed);
+      const relPath = path.relative(targetDir, file);
+      for (const [extName, ext] of extensions) {
+        findings.push(...this.auditExtension(extName, ext, relPath));
       }
     }
 
