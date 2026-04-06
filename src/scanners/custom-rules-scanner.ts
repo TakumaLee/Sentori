@@ -18,10 +18,13 @@ export const CUSTOM_RULES_SCANNER_NAME = 'Custom Rules';
 
 /**
  * Returns true if the regex body (a slice of a pattern string inside a group)
- * contains a repeating quantifier (+, *, or unbounded {n,} / {n,m}) outside of
- * a character class or escape sequence.
+ * contains a repeating quantifier (+, *, or unbounded {n,} / {n,m}) OR a bare
+ * alternation operator (|) outside of a character class or escape sequence.
  *
- * This is used as the inner check for nested-quantifier ReDoS detection.
+ * Alternation under a repeating outer quantifier is a textbook ReDoS vector:
+ * e.g. (cat|dog)+ causes catastrophic backtracking on non-matching input.
+ *
+ * This is used as the inner check for nested-quantifier / alternation ReDoS detection.
  */
 function bodyContainsQuantifier(body: string): boolean {
   let i = 0;
@@ -41,7 +44,7 @@ function bodyContainsQuantifier(body: string): boolean {
       }
       continue;
     }
-    if (ch === '+' || ch === '*') return true;
+    if (ch === '+' || ch === '*' || ch === '|') return true;
     if (ch === '{') {
       // {n,} or {n,m} — both allow repetition beyond 1 occurrence
       const close = body.indexOf('}', i + 1);
@@ -131,9 +134,9 @@ export function detectRedos(pattern: string): string | null {
     if (bodyContainsQuantifier(effectiveBody)) {
       const snippet = effectiveBody.slice(0, 40);
       return (
-        `nested quantifier at position ${start}: ` +
+        `nested quantifier or alternation at position ${start}: ` +
         `group body "${snippet}${effectiveBody.length > 40 ? '…' : ''}" ` +
-        `contains a repeating quantifier and is itself repeated — ` +
+        `contains a repeating quantifier or alternation and is itself repeated — ` +
         `this pattern can cause catastrophic backtracking`
       );
     }

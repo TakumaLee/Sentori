@@ -28,13 +28,14 @@ describe('detectRedos', () => {
   test('returns null for safe patterns', () => {
     const safe = [
       'AKIA[0-9A-Z]{16}',
-      '(cat|dog)+',
       '([a-z])+',
       '\\w+',
       '(ab){3}',
       '(foo)?',
       '(?=foo)bar',
       '(?:abc){1,3}',
+      // alternation WITHOUT an outer repeating quantifier is safe
+      '(a|b)',
     ];
     for (const p of safe) {
       expect(detectRedos(p)).toBeNull();
@@ -74,6 +75,19 @@ describe('detectRedos', () => {
     const reason = detectRedos('(\\w+)+');
     expect(reason).toMatch(/nested quantifier/i);
     expect(reason).toMatch(/catastrophic backtracking/i);
+  });
+
+  // Alternation under a repeating quantifier — textbook ReDoS vectors
+  test('flags alternation under outer + quantifier (cat|dog)+', () => {
+    expect(detectRedos('(cat|dog)+')).not.toBeNull();
+  });
+
+  test('flags alternation under outer + quantifier (a|b)+', () => {
+    expect(detectRedos('(a|b)+')).not.toBeNull();
+  });
+
+  test('flags alternation with multiple alternatives under outer + quantifier (foo|bar|baz)+', () => {
+    expect(detectRedos('(foo|bar|baz)+')).not.toBeNull();
   });
 });
 
