@@ -256,8 +256,8 @@ async function loadConfig(filePath: string): Promise<McpServerConfig | null> {
   }
   const result = McpServerConfigSchema.safeParse(raw);
   if (!result.success) {
-    process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'McpServerAuditor', file: filePath, error: 'MCP config schema validation failed — using raw', issues: result.error.issues }) + '\n');
-    return raw as McpServerConfig;
+    process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'McpServerAuditor', file: filePath, error: 'MCP config schema validation failed — skipping', issues: result.error.issues }) + '\n');
+    return null;
   }
   return result.data as McpServerConfig;
 }

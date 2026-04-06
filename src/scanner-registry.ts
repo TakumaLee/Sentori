@@ -50,16 +50,21 @@ export class ScannerRegistry {
 
     // Run scanners in parallel with configurable concurrency.
     // Priority: options.concurrency > SENTORI_CONCURRENCY env var > Math.min(5, os.cpus().length)
+    // Hard cap at 50 to prevent fd exhaustion from runaway values (e.g. SENTORI_CONCURRENCY=100000).
+    const MAX_CONCURRENCY = 50;
     const rawEnvConcurrency = process.env.SENTORI_CONCURRENCY;
     let envConcurrency = NaN;
     if (rawEnvConcurrency !== undefined) {
       envConcurrency = parseInt(rawEnvConcurrency, 10);
       if (!Number.isFinite(envConcurrency) || envConcurrency <= 0) {
-        console.warn(`[sentori] SENTORI_CONCURRENCY="${rawEnvConcurrency}" is not a valid positive integer — using default concurrency`);
+        process.stderr.write(JSON.stringify({ level: 'warn', context: 'scanner-registry', message: `SENTORI_CONCURRENCY="${rawEnvConcurrency}" is not a valid positive integer — using default concurrency` }) + '\n');
         envConcurrency = NaN;
       }
     }
-    const CONCURRENCY = options?.concurrency ?? (Number.isFinite(envConcurrency) ? envConcurrency : Math.min(5, os.cpus().length));
+    const CONCURRENCY = Math.min(
+      options?.concurrency ?? (Number.isFinite(envConcurrency) ? envConcurrency : Math.min(5, os.cpus().length)),
+      MAX_CONCURRENCY,
+    );
     let nextIndex = 0;
     let completedCount = 0;
 

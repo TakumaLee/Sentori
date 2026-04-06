@@ -42,7 +42,7 @@
     "nexylore"
   ],
   "author": "Nexylore",
-  "license": "BSL-1.1",
+  "license": "MIT",
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
     "@types/glob": "^8.1.0",
