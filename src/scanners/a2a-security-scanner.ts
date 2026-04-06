@@ -130,7 +130,13 @@ async function resolveAgentCard(input: string): Promise<{ card: A2AAgentCard; so
   const isFilePath = input.startsWith('/') || input.startsWith('./') || input.startsWith('../');
   if (isFilePath || fs.existsSync(input)) {
     const raw = fs.readFileSync(input, 'utf8');
-    const card = JSON.parse(raw) as A2AAgentCard;
+    let card: A2AAgentCard;
+    try {
+      card = JSON.parse(raw) as A2AAgentCard;
+    } catch (err) {
+      process.stderr.write(JSON.stringify({ level: 'error', scanner: 'A2ASecurityScanner', source: input, error: 'JSON parse failed', message: String(err) }) + '\n');
+      throw new Error(`Invalid JSON in agent card file "${input}": ${String(err)}`);
+    }
     return { card, source: input, isHttp: false };
   }
 
@@ -145,7 +151,13 @@ async function resolveAgentCard(input: string): Promise<{ card: A2AAgentCard; so
   }
 
   const raw = await fetchUrl(url);
-  const card = JSON.parse(raw) as A2AAgentCard;
+  let card: A2AAgentCard;
+  try {
+    card = JSON.parse(raw) as A2AAgentCard;
+  } catch (err) {
+    process.stderr.write(JSON.stringify({ level: 'error', scanner: 'A2ASecurityScanner', source: url, error: 'JSON parse failed', message: String(err) }) + '\n');
+    throw new Error(`Invalid JSON in agent card response from "${url}": ${String(err)}`);
+  }
   return { card, source: url, isHttp: url.startsWith('http://') };
 }
 

@@ -13,6 +13,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
+import { z } from 'zod';
 import { ScannerModule, ScanResult, Finding, ScannerOptions } from '../types';
 
 // ============================================================
@@ -48,6 +49,35 @@ interface McpToolDefinition {
   permissions?: string[];
   [key: string]: unknown;
 }
+
+// Zod schemas for MCP config validation — prevents downstream crashes from
+// malformed config files in scanned projects.
+const McpToolDefinitionSchema = z.object({
+  name: z.string(),
+  description: z.string().optional(),
+  command: z.string().optional(),
+  execute: z.string().optional(),
+  shell: z.boolean().optional(),
+  permissions: z.array(z.string()).optional(),
+}).passthrough();
+
+const McpServerEntrySchema = z.object({
+  command: z.string().optional(),
+  args: z.array(z.string()).optional(),
+  env: z.record(z.string(), z.string()).optional(),
+  url: z.string().optional(),
+  endpoint: z.string().optional(),
+  tools: z.array(McpToolDefinitionSchema).optional(),
+  permissions: z.union([z.array(z.string()), z.record(z.string(), z.unknown())]).optional(),
+  allowlist: z.array(z.string()).optional(),
+  denylist: z.array(z.string()).optional(),
+}).passthrough();
+
+const McpServerConfigSchema = z.object({
+  mcpServers: z.record(z.string(), McpServerEntrySchema).optional(),
+  servers: z.record(z.string(), McpServerEntrySchema).optional(),
+  mcp_servers: z.record(z.string(), McpServerEntrySchema).optional(),
+}).passthrough();
 
 interface RiskReport {
   serverName: string;
@@ -210,19 +240,26 @@ async function findMcpConfigFiles(rootPath: string): Promise<string[]> {
 // ============================================================
 
 async function loadConfig(filePath: string): Promise<McpServerConfig | null> {
+  let raw: unknown;
   try {
     const content = await fs.promises.readFile(filePath, 'utf-8');
-    
     if (filePath.endsWith('.json')) {
-      return JSON.parse(content) as McpServerConfig;
+      raw = JSON.parse(content);
     } else if (filePath.endsWith('.yaml') || filePath.endsWith('.yml')) {
-      return yaml.load(content) as McpServerConfig;
+      raw = yaml.load(content);
+    } else {
+      return null;
     }
-    
-    return null;
   } catch (err) {
+    process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'McpServerAuditor', file: filePath, error: 'config read/parse failed', message: String(err) }) + '\n');
     return null;
   }
+  const result = McpServerConfigSchema.safeParse(raw);
+  if (!result.success) {
+    process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'McpServerAuditor', file: filePath, error: 'MCP config schema validation failed — using raw', issues: result.error.issues }) + '\n');
+    return raw as McpServerConfig;
+  }
+  return result.data as McpServerConfig;
 }
 
 // ============================================================

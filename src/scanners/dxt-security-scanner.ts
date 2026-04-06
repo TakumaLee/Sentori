@@ -113,8 +113,8 @@ export class DxtSecurityScanner implements Scanner {
         for (const [extName, ext] of extensions) {
           findings.push(...this.auditExtension(extName, ext, relPath));
         }
-      } catch {
-        // Skip unparseable files
+      } catch (err) {
+        process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'DxtSecurityScanner', file, error: 'JSON parse failed — skipping', message: String(err) }) + '\n');
       }
     }
 

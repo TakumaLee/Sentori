@@ -92,7 +92,8 @@ const langchainJsonConfigRule: Rule = {
     let parsed: unknown;
     try {
       parsed = JSON.parse(file.content);
-    } catch {
+    } catch (err) {
+      process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'AgenticFrameworkScanner', rule: 'AGENTIC-002', file: file.relativePath, error: 'JSON parse failed — skipping', message: String(err) }) + '\n');
       return findings;
     }
 
@@ -142,7 +143,8 @@ const autogenApiKeyRule: Rule = {
         let parsed: unknown;
         try {
           parsed = JSON.parse(file.content);
-        } catch {
+        } catch (err) {
+          process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'AgenticFrameworkScanner', rule: 'AGENTIC-003', file: file.relativePath, error: 'JSON parse failed — skipping', message: String(err) }) + '\n');
           return findings;
         }
         const apiKeyFields = ['api_key', 'apiKey', 'openai_api_key'];

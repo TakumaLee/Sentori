@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { z } from 'zod';
 import { Scanner, ScannerOptions, ScanResult, Finding, Severity } from '../types';
 
 // --- Suspicious pattern definitions ---
@@ -34,6 +35,16 @@ interface PackageJson {
   devDependencies?: Record<string, string>;
   [key: string]: unknown;
 }
+
+// Zod schema for package.json — validates structure before scanning lifecycle hooks
+// to prevent crashes from malformed package.json in scanned node_modules.
+const PackageJsonSchema = z.object({
+  name: z.string().optional(),
+  version: z.string().optional(),
+  scripts: z.record(z.string(), z.string()).optional(),
+  dependencies: z.record(z.string(), z.string()).optional(),
+  devDependencies: z.record(z.string(), z.string()).optional(),
+}).passthrough();
 
 // --- Scanner class ---
 
@@ -129,8 +140,19 @@ export class PostinstallScanner implements Scanner {
 
     try {
       const content = fs.readFileSync(packageJsonPath, 'utf-8');
-      const pkg: PackageJson = JSON.parse(content);
-      
+      let raw: unknown;
+      try {
+        raw = JSON.parse(content);
+      } catch (err) {
+        process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'PostinstallScanner', file: packageJsonPath, error: 'package.json JSON parse failed — skipping', message: String(err) }) + '\n');
+        return;
+      }
+      const schemaResult = PackageJsonSchema.safeParse(raw);
+      if (!schemaResult.success) {
+        process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'PostinstallScanner', file: packageJsonPath, error: 'package.json schema validation failed — scanning raw', issues: schemaResult.error.issues }) + '\n');
+      }
+      const pkg: PackageJson = (schemaResult.success ? schemaResult.data : raw) as PackageJson;
+
       if (!pkg.scripts) {
         return;
       }

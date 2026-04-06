@@ -220,7 +220,13 @@ async function callModel(
         messages: [{ role: 'user', content: userMessage }],
       },
     );
-    const parsed = JSON.parse(raw) as { content?: Array<{ text?: string }>; error?: { message?: string } };
+    let parsed: { content?: Array<{ text?: string }>; error?: { message?: string } };
+    try {
+      parsed = JSON.parse(raw) as typeof parsed;
+    } catch (err) {
+      process.stderr.write(JSON.stringify({ level: 'error', context: 'cc-bos-red-team', model, error: 'Anthropic API response JSON parse failed', message: String(err) }) + '\n');
+      throw new Error(`Anthropic API malformed JSON response: ${String(err)}`);
+    }
     if (parsed.error) throw new Error(parsed.error.message ?? 'API error');
     return parsed.content?.[0]?.text ?? '';
   }
@@ -241,10 +247,16 @@ async function callModel(
         ],
       },
     );
-    const parsed = JSON.parse(raw) as {
+    let parsed: {
       choices?: Array<{ message?: { content?: string } }>;
       error?: { message?: string };
     };
+    try {
+      parsed = JSON.parse(raw) as typeof parsed;
+    } catch (err) {
+      process.stderr.write(JSON.stringify({ level: 'error', context: 'cc-bos-red-team', model, error: 'OpenAI API response JSON parse failed', message: String(err) }) + '\n');
+      throw new Error(`OpenAI API malformed JSON response: ${String(err)}`);
+    }
     if (parsed.error) throw new Error(parsed.error.message ?? 'API error');
     return parsed.choices?.[0]?.message?.content ?? '';
   }

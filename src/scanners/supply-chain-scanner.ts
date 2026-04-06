@@ -74,8 +74,8 @@ export function loadIOC(externalPath?: string): IOCBlocklist {
       if (ext.malicious_domains) {
         base.malicious_domains = [...new Set([...base.malicious_domains, ...ext.malicious_domains])];
       }
-    } catch {
-      // ignore malformed external IOC
+    } catch (err) {
+      process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'SupplyChainScanner', file: externalPath, error: 'External IOC blocklist JSON parse failed — using defaults', message: String(err) }) + '\n');
     }
   }
   return base;
