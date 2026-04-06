@@ -109,6 +109,74 @@ describe('ScannerRegistry.runAll', () => {
     expect(okResultEntry.error).toBeUndefined();
   });
 
+  // ---------------------------------------------------------------------------
+  // classifyError — FileError / NetworkError / SENTORI_DEBUG stack
+  // ---------------------------------------------------------------------------
+
+  it.each([
+    { code: 'ENOENT', label: 'ENOENT (file not found)' },
+    { code: 'EACCES', label: 'EACCES (permission denied)' },
+  ])('classifies $label as FileError', async ({ code }) => {
+    const registry = new ScannerRegistry();
+    registry.register(
+      makeScanner('file-err', async () => {
+        const err = Object.assign(new Error('file error'), { code });
+        throw err;
+      }),
+    );
+
+    const report = await registry.runAll('/tmp/test', undefined, {});
+    const result = report.results[0];
+    expect(result.error?.type).toBe('FileError');
+    expect(result.error?.message).toBe('file error');
+  });
+
+  it('classifies ECONNREFUSED as NetworkError', async () => {
+    const registry = new ScannerRegistry();
+    registry.register(
+      makeScanner('net-err', async () => {
+        const err = Object.assign(new Error('connection refused'), { code: 'ECONNREFUSED' });
+        throw err;
+      }),
+    );
+
+    const report = await registry.runAll('/tmp/test', undefined, {});
+    const result = report.results[0];
+    expect(result.error?.type).toBe('NetworkError');
+    expect(result.error?.message).toBe('connection refused');
+  });
+
+  it('includes stack in error when SENTORI_DEBUG=true, omits it otherwise', async () => {
+    const makeErrScanner = () =>
+      makeScanner('err', async () => {
+        throw new Error('debug test error');
+      });
+
+    const originalDebug = process.env.SENTORI_DEBUG;
+
+    try {
+      // With debug enabled
+      process.env.SENTORI_DEBUG = 'true';
+      const registryDebug = new ScannerRegistry();
+      registryDebug.register(makeErrScanner());
+      const reportDebug = await registryDebug.runAll('/tmp/test', undefined, {});
+      expect(reportDebug.results[0].error?.stack).toBeDefined();
+
+      // With debug disabled
+      process.env.SENTORI_DEBUG = 'false';
+      const registryNoDebug = new ScannerRegistry();
+      registryNoDebug.register(makeErrScanner());
+      const reportNoDebug = await registryNoDebug.runAll('/tmp/test', undefined, {});
+      expect(reportNoDebug.results[0].error?.stack).toBeUndefined();
+    } finally {
+      if (originalDebug === undefined) {
+        delete process.env.SENTORI_DEBUG;
+      } else {
+        process.env.SENTORI_DEBUG = originalDebug;
+      }
+    }
+  });
+
   it('still produces a valid summary when some scanners fail', async () => {
     const registry = new ScannerRegistry();
     registry.register(
