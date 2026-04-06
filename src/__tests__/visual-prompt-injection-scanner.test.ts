@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { VisualPromptInjectionScanner } from '../scanners/visual-prompt-injection-scanner';
+import { OcrWorkerPool } from '../utils/ocr-worker-pool';
 
 function createTempProject(files: Record<string, string>): string {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentori-vpi-test-'));
@@ -364,6 +365,112 @@ async function analyzeImage(imagePath: string) {
         cleanup(dir);
       }
     }, 30000); // Increase timeout to 30s for OCR operations
+  });
+
+  describe('OCR worker pool integration', () => {
+    const OLD_ENV = process.env;
+
+    beforeEach(() => { process.env = { ...OLD_ENV, SENTORI_DEEP_SCAN: '1' }; });
+    afterEach(() => { process.env = OLD_ENV; });
+
+    /**
+     * Installs a mock OcrWorkerPool on the scanner that resolves immediately
+     * with the provided text, so tests don't depend on tesseract being installed.
+     */
+    function mockPool(textFn: (p: string) => string, opts?: { budgetMs?: number }): OcrWorkerPool {
+      const pool = new OcrWorkerPool({ concurrency: 4, budgetMs: opts?.budgetMs ?? 5000 });
+      (pool as any).runOcr = async (imagePath: string) => ({
+        text: textFn(imagePath),
+        budgetExceeded: false,
+      });
+      return pool;
+    }
+
+    test('uses ocrPool.recognize instead of direct tesseract', async () => {
+      const dir = createTempProject({
+        'images/test.png': 'fake png',
+      });
+      // Write a real 1-byte file so existsSync passes
+      fs.writeFileSync(path.join(dir, 'images/test.png'), Buffer.from([0x89, 0x50]));
+
+      const scanner = new VisualPromptInjectionScanner();
+      let called = false;
+      scanner.ocrPool = mockPool(() => { called = true; return ''; });
+      scanner.ocrPool.startBudget();
+
+      try {
+        await scanner.scan(dir);
+        expect(called).toBe(true);
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('skips images when OCR budget is exceeded', async () => {
+      const dir = createTempProject({
+        'images/a.png': 'fake',
+        'images/b.png': 'fake',
+        'images/c.png': 'fake',
+      });
+      // Write tiny valid-ish files
+      for (const name of ['a.png', 'b.png', 'c.png']) {
+        fs.writeFileSync(path.join(dir, 'images', name), Buffer.from([0x89, 0x50]));
+      }
+
+      const scanner = new VisualPromptInjectionScanner();
+      let processedCount = 0;
+      const pool = new OcrWorkerPool({ concurrency: 1, budgetMs: 1 });
+      (pool as any).runOcr = async () => {
+        processedCount++;
+        await new Promise(r => setTimeout(r, 10));
+        return { text: '', budgetExceeded: false };
+      };
+      scanner.ocrPool = pool;
+
+      try {
+        const result = await scanner.scan(dir);
+        // Budget expired immediately; most images should be skipped (budgetExceeded path)
+        expect(result.findings).toBeDefined();
+        // processed count must be < total images (budget should have cut it short)
+        expect(processedCount).toBeLessThan(3);
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('concurrently processes images up to pool concurrency limit', async () => {
+      const imageCount = 6;
+      const files: Record<string, string> = {};
+      for (let i = 0; i < imageCount; i++) {
+        files[`images/img${i}.png`] = 'fake';
+      }
+      const dir = createTempProject(files);
+      for (let i = 0; i < imageCount; i++) {
+        fs.writeFileSync(path.join(dir, `images/img${i}.png`), Buffer.from([0x89, 0x50]));
+      }
+
+      let active = 0;
+      let maxActive = 0;
+      const concurrency = 2;
+
+      const scanner = new VisualPromptInjectionScanner();
+      const pool = new OcrWorkerPool({ concurrency, budgetMs: 10_000 });
+      (pool as any).runOcr = async () => {
+        active++;
+        maxActive = Math.max(maxActive, active);
+        await new Promise(r => setTimeout(r, 10));
+        active--;
+        return { text: '', budgetExceeded: false };
+      };
+      scanner.ocrPool = pool;
+
+      try {
+        await scanner.scan(dir);
+        expect(maxActive).toBeLessThanOrEqual(concurrency);
+      } finally {
+        cleanup(dir);
+      }
+    });
   });
 
   describe('Basic functionality', () => {
