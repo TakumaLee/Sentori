@@ -7,22 +7,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { glob } from 'glob';
-import { ScanResult, Finding, Severity } from '../types';
+import { ScanResult, Finding, Severity, ScannerOptions } from '../types';
 import { CustomRule } from '../config/sentori-config';
+import { buildIgnoreList } from '../utils/file-utils';
 
 export const CUSTOM_RULES_SCANNER_NAME = 'Custom Rules';
 
 const DEFAULT_GLOB = '**/*';
-const DEFAULT_IGNORE = [
-  '**/node_modules/**',
-  '**/dist/**',
-  '**/build/**',
-  '**/.git/**',
-  '**/vendor/**',
-  '**/__pycache__/**',
-  '**/*.min.js',
-  '**/*.map',
-];
 
 /** Max file size to scan (1 MB) */
 const MAX_FILE_BYTES = 1_048_576;
@@ -45,6 +36,7 @@ function isBinaryExtension(filePath: string): boolean {
 export async function runCustomRules(
   targetDir: string,
   rules: CustomRule[],
+  options?: ScannerOptions,
 ): Promise<ScanResult> {
   const start = Date.now();
   const findings: Finding[] = [];
@@ -81,7 +73,7 @@ export async function runCustomRules(
     const files = await glob(globPattern, {
       cwd: targetDir,
       nodir: true,
-      ignore: DEFAULT_IGNORE,
+      ignore: buildIgnoreList(options?.exclude, options?.includeVendored),
       absolute: true,
     });
 
@@ -160,7 +152,7 @@ export async function runCustomRules(
 export const customRulesScanner = (rules: CustomRule[]) => ({
   name: CUSTOM_RULES_SCANNER_NAME,
   description: 'User-defined pattern rules from .sentori.yml',
-  async scan(targetDir: string): Promise<ScanResult> {
-    return runCustomRules(targetDir, rules);
+  async scan(targetDir: string, options?: ScannerOptions): Promise<ScanResult> {
+    return runCustomRules(targetDir, rules, options);
   },
 });
