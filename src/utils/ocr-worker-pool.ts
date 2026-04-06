@@ -99,21 +99,29 @@ export class OcrWorkerPool {
       : this.timeoutMs;
     const effectiveTimeout = Math.min(this.timeoutMs, remaining);
 
+    // Budget expired between the isBudgetExceeded() check and here — skip the
+    // worker entirely instead of creating it only to time it out immediately.
+    if (effectiveTimeout <= 0) {
+      return { text: '', budgetExceeded: true };
+    }
+
     const tesseract = await getTesseract();
     const worker = await tesseract.createWorker('eng', undefined, {
       logger: () => {},
     });
 
     const recognizePromise = worker.recognize(imagePath);
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('OCR timeout')), effectiveTimeout)
-    );
+    let timeoutHandle!: NodeJS.Timeout;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutHandle = setTimeout(() => reject(new Error('OCR timeout')), effectiveTimeout);
+    });
 
     let text = '';
     try {
       const result = await Promise.race([recognizePromise, timeoutPromise]);
       text = (result as any).data.text ?? '';
     } finally {
+      clearTimeout(timeoutHandle);
       await worker.terminate();
     }
 

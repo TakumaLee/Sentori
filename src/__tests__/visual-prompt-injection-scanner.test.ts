@@ -432,7 +432,7 @@ async function analyzeImage(imagePath: string) {
         // Budget expired immediately; most images should be skipped (budgetExceeded path)
         expect(result.findings).toBeDefined();
         // processed count must be < total images (budget should have cut it short)
-        expect(processedCount).toBeLessThanOrEqual(3);
+        expect(processedCount).toBeLessThan(3);
       } finally {
         cleanup(dir);
       }
