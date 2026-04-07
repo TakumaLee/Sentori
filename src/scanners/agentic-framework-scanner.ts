@@ -1,7 +1,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { z } from 'zod';
 import { Scanner, ScanResult, Finding, Severity, ScannerOptions } from '../types';
 import { walkFiles, FileEntry } from '../utils/file-walker';
+
+// Zod schema for generic key-value JSON config used by LangChain/AutoGen configs.
+// We only require it to be a non-null object; the recursive extractFieldValues
+// traversal handles whatever shape is inside.
+const GenericJsonObjectSchema = z.record(z.string(), z.unknown());
 
 /**
  * AgenticFrameworkScanner
@@ -89,13 +95,19 @@ const langchainJsonConfigRule: Rule = {
       /\.langchain[/\\].+\.json$/i.test(file.relativePath);
     if (!isLangchainConfig) return findings;
 
-    let parsed: unknown;
+    let rawParsed: unknown;
     try {
-      parsed = JSON.parse(file.content);
+      rawParsed = JSON.parse(file.content);
     } catch (err) {
       process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'AgenticFrameworkScanner', rule: 'AGENTIC-002', file: file.relativePath, error: 'JSON parse failed — skipping', message: String(err) }) + '\n');
       return findings;
     }
+    const schemaResult002 = GenericJsonObjectSchema.safeParse(rawParsed);
+    if (!schemaResult002.success) {
+      process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'AgenticFrameworkScanner', rule: 'AGENTIC-002', file: file.relativePath, error: 'LangChain config is not a JSON object — skipping', issues: schemaResult002.error.issues }) + '\n');
+      return findings;
+    }
+    const parsed: unknown = schemaResult002.data;
 
     // Walk the JSON for key-like fields
     const apiKeyFields = ['api_key', 'apiKey', 'langchain_api_key', 'openai_api_key', 'anthropic_api_key'];
@@ -140,15 +152,22 @@ const autogenApiKeyRule: Rule = {
     if (isAutogenConfig) {
       // JSON config: look for api_key fields
       if (file.relativePath.endsWith('.json')) {
-        let parsed: unknown;
+        let rawParsed003: unknown;
         try {
-          parsed = JSON.parse(file.content);
+          rawParsed003 = JSON.parse(file.content);
         } catch (err) {
           process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'AgenticFrameworkScanner', rule: 'AGENTIC-003', file: file.relativePath, error: 'JSON parse failed — skipping', message: String(err) }) + '\n');
           return findings;
         }
+        // AutoGen configs may be arrays (OAI_CONFIG_LIST) or objects — accept either.
+        const schemaResult003 = z.union([GenericJsonObjectSchema, z.array(z.unknown())]).safeParse(rawParsed003);
+        if (!schemaResult003.success) {
+          process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'AgenticFrameworkScanner', rule: 'AGENTIC-003', file: file.relativePath, error: 'AutoGen config JSON has unexpected shape — skipping', issues: schemaResult003.error.issues }) + '\n');
+          return findings;
+        }
+        const parsed003: unknown = schemaResult003.data;
         const apiKeyFields = ['api_key', 'apiKey', 'openai_api_key'];
-        for (const { key, value, path: fieldPath } of extractFieldValues(parsed, apiKeyFields)) {
+        for (const { key, value, path: fieldPath } of extractFieldValues(parsed003, apiKeyFields)) {
           if (isPlaceholder(value)) continue;
           findings.push({
             scanner: 'AgenticFrameworkScanner',

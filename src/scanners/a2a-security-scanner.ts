@@ -109,17 +109,26 @@ const BROAD_CAPABILITY_COMBO = ['streaming', 'pushNotifications', 'stateTransiti
 
 // ─── HTTP fetch helper ────────────────────────────────────────────────────────
 
+// Maximum body size for a fetched agent card: 1 MB. Agent cards are small JSON
+// documents; capping prevents memory exhaustion from unbounded responses.
+const FETCH_MAX_BYTES = 1 * 1024 * 1024;
+
 function fetchUrl(url: string, timeoutMs = 8000, maxRedirects = 3): Promise<string> {
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const done = (fn: () => void): void => {
+      if (!settled) { settled = true; fn(); }
+    };
+
     const attempt = (currentUrl: string, hopsLeft: number): void => {
       const mod = currentUrl.startsWith('https://') ? https : http;
       const req = (mod as typeof https).get(currentUrl, { timeout: timeoutMs }, (res) => {
         const status = res.statusCode ?? 0;
         // Follow 301/302/303/307/308 redirects
         if ((status === 301 || status === 302 || status === 303 || status === 307 || status === 308) && res.headers.location) {
-          res.resume(); // drain response
+          res.resume(); // drain response to free the socket
           if (hopsLeft <= 0) {
-            reject(new Error(`Too many redirects fetching ${url}`));
+            done(() => reject(new Error(`Too many redirects fetching ${url}`)));
             return;
           }
           // Resolve relative redirect URLs against the current URL
@@ -131,17 +140,47 @@ function fetchUrl(url: string, timeoutMs = 8000, maxRedirects = 3): Promise<stri
           attempt(next, hopsLeft - 1);
           return;
         }
+
+        // Enforce response size cap via Content-Length header if present.
+        const contentLength = parseInt(res.headers['content-length'] ?? '0', 10);
+        if (contentLength > FETCH_MAX_BYTES) {
+          res.resume(); // drain to free the socket
+          done(() => reject(new Error(`Agent card response too large (Content-Length: ${contentLength} bytes) from ${currentUrl}`)));
+          return;
+        }
+
         const chunks: Buffer[] = [];
-        res.on('data', (chunk: Buffer) => chunks.push(chunk));
-        res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-        res.on('error', reject);
+        let totalBytes = 0;
+
+        res.on('data', (chunk: Buffer) => {
+          totalBytes += chunk.length;
+          if (totalBytes > FETCH_MAX_BYTES) {
+            res.resume(); // drain remaining data
+            done(() => reject(new Error(`Agent card response too large (> ${FETCH_MAX_BYTES} bytes) from ${currentUrl}`)));
+            return;
+          }
+          chunks.push(chunk);
+        });
+
+        res.on('end', () => {
+          done(() => resolve(Buffer.concat(chunks).toString('utf8')));
+        });
+
+        res.on('error', (err) => {
+          done(() => reject(err));
+        });
       });
-      req.on('error', reject);
+
+      req.on('error', (err) => {
+        done(() => reject(err));
+      });
+
       req.on('timeout', () => {
         req.destroy();
-        reject(new Error(`Request to ${currentUrl} timed out after ${timeoutMs}ms`));
+        done(() => reject(new Error(`Request to ${currentUrl} timed out after ${timeoutMs}ms`)));
       });
     };
+
     attempt(url, maxRedirects);
   });
 }
