@@ -98,6 +98,7 @@ function printHelp(): void {
   console.log(chalk.gray('    --include-workspace-projects  Scan sub-projects inside workspace/ (default: skip)'));
   console.log(chalk.gray('    --discover           Auto-discover and scan agent configs in common paths'));
   console.log(chalk.gray('    --watch              Re-scan automatically when config files change'));
+  console.log(chalk.gray('    --concurrency N      Max parallel scanners (default: Math.min(5, cpu_count); GH Actions: 2)'));
   console.log('');
   console.log(chalk.bold('  Examples:'));
   console.log(chalk.cyan('    npx @nexylore/sentori scan'));
@@ -199,6 +200,17 @@ async function main(): Promise<void> {
   const includeWorkspaceProjects = args.includes('--include-workspace-projects');
   const requireProvenance = args.includes('--require-provenance');
 
+  let concurrency: number | undefined;
+  const concurrencyIdx = args.findIndex((a) => a === '--concurrency');
+  if (concurrencyIdx !== -1 && args[concurrencyIdx + 1]) {
+    const parsed = parseInt(args[concurrencyIdx + 1], 10);
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      console.error(chalk.red(`  ✗ --concurrency must be a positive integer, got: "${args[concurrencyIdx + 1]}"`));
+      process.exit(1);
+    }
+    concurrency = parsed;
+  }
+
   const excludes: string[] = [];
   for (let i = 0; i < args.length; i++) {
     if ((args[i] === '--exclude' || args[i] === '-e') && args[i + 1] && !args[i + 1].startsWith('-')) {
@@ -232,7 +244,7 @@ async function main(): Promise<void> {
 
   // Collect positional args (not flags or flag values)
   const flagValuePositions = new Set<number>();
-  for (const flag of ['--output', '-o', '--ioc', '--format', '--profile']) {
+  for (const flag of ['--output', '-o', '--ioc', '--format', '--profile', '--concurrency']) {
     const idx = args.findIndex((a) => a === flag);
     if (idx !== -1) flagValuePositions.add(idx + 1);
   }
@@ -278,6 +290,7 @@ async function main(): Promise<void> {
     sentoriIgnorePatterns,
     requireProvenance,
     watchMode,
+    concurrency,
   };
 
   if (watchMode) {
@@ -329,6 +342,7 @@ interface ScanOptions {
   sentoriIgnorePatterns: string[];
   requireProvenance: boolean;
   watchMode: boolean;
+  concurrency?: number;
   scannerFilter?: string[] | null;
   isRescan?: boolean;
 }
@@ -338,7 +352,7 @@ async function runScan(opts: ScanOptions): Promise<void> {
     targetDir, outputFormat, outputPath, iocPath, profile,
     includeVendored, includeWorkspaceProjects, excludes,
     sentoriIgnorePatterns, requireProvenance, watchMode,
-    scannerFilter,
+    concurrency, scannerFilter,
   } = opts;
   const jsonMode = outputFormat === 'json';
   const sarifMode = outputFormat === 'sarif';
@@ -401,6 +415,7 @@ async function runScan(opts: ScanOptions): Promise<void> {
     includeWorkspaceProjects,
     exclude: excludes.length > 0 ? excludes : undefined,
     sentoriIgnorePatterns: sentoriIgnorePatterns.length > 0 ? sentoriIgnorePatterns : undefined,
+    concurrency,
   };
 
   let report = await registry.runAll(targetDir, (step, total, name, result) => {

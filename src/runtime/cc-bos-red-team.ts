@@ -168,12 +168,22 @@ export function generateAttackVariants(
 
 // ─── LLM Client (reuses cross-lingual-checker pattern) ───────────────────────
 
+// Maximum response body size: 4 MB. LLM API responses are never larger than
+// this; capping prevents memory exhaustion if a rogue / misconfigured endpoint
+// streams an unbounded body.
+const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
+
 function postJson(
   options: https.RequestOptions,
   body: object,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(body);
+    let settled = false;
+    const done = (fn: () => void): void => {
+      if (!settled) { settled = true; fn(); }
+    };
+
     const req = https.request(
       {
         ...options,
@@ -185,13 +195,39 @@ function postJson(
         },
       },
       (res) => {
-        let out = '';
-        res.on('data', (c) => { out += c; });
-        res.on('end', () => resolve(out));
+        const chunks: Buffer[] = [];
+        let totalBytes = 0;
+
+        res.on('data', (chunk: Buffer) => {
+          totalBytes += chunk.length;
+          if (totalBytes > MAX_RESPONSE_BYTES) {
+            // Drain and discard; destroy the socket to free resources.
+            res.resume();
+            done(() => reject(new Error(`Response too large (> ${MAX_RESPONSE_BYTES} bytes)`)));
+            return;
+          }
+          chunks.push(chunk);
+        });
+
+        res.on('end', () => {
+          done(() => resolve(Buffer.concat(chunks).toString('utf8')));
+        });
+
+        res.on('error', (err) => {
+          done(() => reject(err));
+        });
       },
     );
-    req.on('error', reject);
-    req.setTimeout(60_000, () => { req.destroy(new Error('request timeout')); });
+
+    req.on('error', (err) => {
+      done(() => reject(err));
+    });
+
+    req.setTimeout(60_000, () => {
+      // destroy() will emit 'error' on the request, which calls done(reject).
+      req.destroy(new Error('request timeout'));
+    });
+
     req.write(data);
     req.end();
   });
@@ -220,7 +256,13 @@ async function callModel(
         messages: [{ role: 'user', content: userMessage }],
       },
     );
-    const parsed = JSON.parse(raw) as { content?: Array<{ text?: string }>; error?: { message?: string } };
+    let parsed: { content?: Array<{ text?: string }>; error?: { message?: string } };
+    try {
+      parsed = JSON.parse(raw) as typeof parsed;
+    } catch (err) {
+      process.stderr.write(JSON.stringify({ level: 'error', context: 'cc-bos-red-team', model, error: 'Anthropic API response JSON parse failed', message: String(err) }) + '\n');
+      throw new Error(`Anthropic API malformed JSON response: ${String(err)}`);
+    }
     if (parsed.error) throw new Error(parsed.error.message ?? 'API error');
     return parsed.content?.[0]?.text ?? '';
   }
@@ -241,10 +283,16 @@ async function callModel(
         ],
       },
     );
-    const parsed = JSON.parse(raw) as {
+    let parsed: {
       choices?: Array<{ message?: { content?: string } }>;
       error?: { message?: string };
     };
+    try {
+      parsed = JSON.parse(raw) as typeof parsed;
+    } catch (err) {
+      process.stderr.write(JSON.stringify({ level: 'error', context: 'cc-bos-red-team', model, error: 'OpenAI API response JSON parse failed', message: String(err) }) + '\n');
+      throw new Error(`OpenAI API malformed JSON response: ${String(err)}`);
+    }
     if (parsed.error) throw new Error(parsed.error.message ?? 'API error');
     return parsed.choices?.[0]?.message?.content ?? '';
   }

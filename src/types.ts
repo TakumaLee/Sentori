@@ -1,5 +1,14 @@
 export type Severity = 'critical' | 'high' | 'medium' | 'info';
 
+export type ErrorType = 'FileError' | 'TimeoutError' | 'NetworkError' | 'LogicError';
+
+export interface ScanError {
+  type: ErrorType;
+  message: string;
+  /** Stack trace — present only when SENTORI_DEBUG=true */
+  stack?: string;
+}
+
 /**
  * Scan context controls how findings are severity-adjusted:
  *  - app: default — standard scanning
@@ -36,7 +45,7 @@ export interface ScanResult {
   filesScanned?: number;
   duration: number; // ms
   /** Present when the scanner timed out, was aborted, or threw an error */
-  error?: string;
+  error?: ScanError;
 }
 
 export interface ScanReport {
@@ -90,6 +99,8 @@ export interface ScannerOptions {
   timeout?: number;
   /** AbortSignal to cancel remaining scanners */
   signal?: AbortSignal;
+  /** Maximum number of scanners to run in parallel. Default: Math.min(5, os.cpus().length) */
+  concurrency?: number;
 }
 
 /** Unified scanner interface — covers both class-based and module-based scanners. */
