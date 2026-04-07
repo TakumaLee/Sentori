@@ -28,19 +28,22 @@ export class VisualPromptInjectionScanner implements Scanner {
     }
 
     // Scan image files only in deep-scan mode (OCR is slow).
-    // Skip findImageFiles() entirely when deep-scan is off to avoid walking the
-    // directory tree only to discard results (perf win on large repos).
+    const imageFiles = this.findImageFiles(targetPath, options?.exclude, options?.sentoriIgnorePatterns, options?.includeWorkspaceProjects);
     if (!process.env.SENTORI_DEEP_SCAN) {
-      findings.push({
-        id: 'VPI-IMG-SUMMARY',
-        scanner: 'visual-prompt-injection-scanner',
-        severity: 'info',
-        title: 'Image files not scanned — OCR not enabled',
-        description: 'Image files may contain embedded prompt injection. Enable --deep-scan to perform OCR analysis.',
-        file: targetPath,
-        confidence: 'possible',
-        recommendation: 'Run with --deep-scan to enable OCR-based visual prompt injection detection.',
-      });
+      // Without OCR, emit one INFO summary instead of per-image findings,
+      // but only when image files are actually present.
+      if (imageFiles.length > 0) {
+        findings.push({
+          id: 'VPI-IMG-SUMMARY',
+          scanner: 'visual-prompt-injection-scanner',
+          severity: 'info',
+          title: `${imageFiles.length} image file(s) found — OCR not enabled`,
+          description: `Found ${imageFiles.length} image file(s) that may contain embedded prompt injection. Enable --deep-scan to perform OCR analysis.`,
+          file: targetPath,
+          confidence: 'possible',
+          recommendation: 'Run with --deep-scan to enable OCR-based visual prompt injection detection.',
+        });
+      }
       return {
         scanner: this.name,
         findings,
@@ -49,21 +52,10 @@ export class VisualPromptInjectionScanner implements Scanner {
       };
     }
 
-    const imageFiles = this.findImageFiles(targetPath, options?.exclude, options?.sentoriIgnorePatterns, options?.includeWorkspaceProjects);
-
-    // Start the scan-level OCR time budget
-    this.ocrPool.startBudget();
-
-    // Process all images concurrently up to the pool's concurrency limit.
-    // Promise.all preserves order; each slot is gated by the pool internally.
-    const imageResults = await Promise.all(
-      imageFiles.map(async (imagePath) => {
-        scannedFiles++;
-        return this.scanImageFile({ path: imagePath, relativePath: path.relative(targetPath, imagePath), content: '' });
-      })
-    );
-    for (const imgFindings of imageResults) {
-      findings.push(...imgFindings);
+    for (const imagePath of imageFiles) {
+      scannedFiles++;
+      const imageFindings = await this.scanImageFile({ path: imagePath, relativePath: path.relative(targetPath, imagePath), content: '' });
+      findings.push(...imageFindings);
     }
 
     return {

@@ -79,6 +79,7 @@ describe('ScannerRegistry.runAll', () => {
     const report = await registry.runAll('/tmp/test', undefined, {
       signal: controller.signal,
       timeout: 5000,
+      concurrency: 1,
     });
 
     expect(report.results[0].scanner).toBe('trigger');
