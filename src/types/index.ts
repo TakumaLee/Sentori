@@ -11,32 +11,45 @@ export type ScanContext = 'app' | 'framework' | 'skill';
 export type Confidence = 'definite' | 'likely' | 'possible';
 
 export interface Finding {
-  id: string;
+  id?: string;
   scanner: string;
   severity: Severity;
-  title: string;
-  description: string;
+  title?: string;
+  description?: string;
+  rule?: string;
+  message?: string;
+  evidence?: string;
   file?: string;
   line?: number;
-  recommendation: string;
+  recommendation?: string;
   confidence?: Confidence;
   /** Tagged as [TEST] — from test files, excluded from scoring */
   isTestFile?: boolean;
+  /** Tagged as third-party code (node_modules, venv, vendor) vs own source code */
+  isThirdParty?: boolean;
 }
 
 export interface ScanResult {
   scanner: string;
   findings: Finding[];
-  scannedFiles: number;
+  scannedFiles?: number;
+  filesScanned?: number;
   duration: number; // ms
+  /** Present when the scanner timed out, was aborted, or threw an error */
+  error?: string;
 }
 
 export interface ScanReport {
-  version: string;
+  version?: string;
   timestamp: string;
   target: string;
   results: ScanResult[];
-  summary: ReportSummary;
+  summary?: ReportSummary;
+  totalFindings?: number;
+  criticalCount?: number;
+  highCount?: number;
+  mediumCount?: number;
+  lowCount?: number;
 }
 
 export interface DimensionScore {
@@ -71,13 +84,25 @@ export interface ScannerOptions {
   includeVendored?: boolean;
   /** Additional glob patterns from .sentoriignore */
   sentoriIgnorePatterns?: string[];
+  /** When true, scan sub-projects inside workspace/ directories. Default: false. */
+  includeWorkspaceProjects?: boolean;
+  /** Per-scanner timeout in milliseconds. Default: 30000 */
+  timeout?: number;
+  /** AbortSignal to cancel remaining scanners */
+  signal?: AbortSignal;
 }
 
-export interface ScannerModule {
+/** Unified scanner interface — covers both class-based and module-based scanners. */
+export interface Scanner {
   name: string;
   description: string;
-  scan(targetPath: string, options?: ScannerOptions): Promise<ScanResult>;
+  scan(targetDir: string, options?: ScannerOptions): Promise<ScanResult>;
 }
+
+/**
+ * @deprecated Use Scanner directly. Kept as a type alias for backward compatibility.
+ */
+export type ScannerModule = Scanner;
 
 export interface McpServerConfig {
   mcpServers?: Record<string, McpServerEntry>;
