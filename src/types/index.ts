@@ -23,8 +23,8 @@ export interface Finding {
   id?: string;
   scanner: string;
   severity: Severity;
-  title?: string;
-  description?: string;
+  title: string;
+  description: string;
   rule?: string;
   message?: string;
   evidence?: string;
@@ -41,8 +41,7 @@ export interface Finding {
 export interface ScanResult {
   scanner: string;
   findings: Finding[];
-  scannedFiles?: number;
-  filesScanned?: number;
+  scannedFiles: number;
   duration: number; // ms
   /** Present when the scanner timed out, was aborted, or threw an error */
   error?: ScanError;

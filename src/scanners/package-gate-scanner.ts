@@ -727,7 +727,7 @@ export class PackageGateScanner implements Scanner {
     return {
       scanner: this.name,
       findings,
-      filesScanned,
+      scannedFiles: filesScanned,
       duration: Date.now() - start,
     };
   }

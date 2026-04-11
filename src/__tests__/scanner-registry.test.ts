@@ -14,7 +14,7 @@ function makeScanner(name: string, impl: (dir: string) => Promise<ScanResult>): 
 }
 
 function okResult(name: string, duration = 10): ScanResult {
-  return { scanner: name, findings: [], duration };
+  return { scanner: name, findings: [], duration, scannedFiles: 0 };
 }
 
 function delay(ms: number): Promise<void> {

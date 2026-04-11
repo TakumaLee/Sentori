@@ -295,6 +295,7 @@ export async function runCustomRules(
   return {
     scanner: CUSTOM_RULES_SCANNER_NAME,
     findings,
+    scannedFiles: 0,
     duration: Date.now() - start,
   };
 }

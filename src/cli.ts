@@ -462,6 +462,7 @@ async function runScan(opts: ScanOptions): Promise<void> {
         scanner: CUSTOM_RULES_SCANNER_NAME,
         findings: warningFindings,
         duration: 0,
+        scannedFiles: 0,
       });
     }
     report.summary = calculateSummary(report.results);

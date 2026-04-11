@@ -329,7 +329,7 @@ describe('ConventionSquattingScanner', () => {
       const dir = createTempDir({ 'A.md': 'a', 'B.md': 'b', 'C.txt': 'c' });
       try {
         const result = await scanner.scan(dir);
-        expect(result.filesScanned).toBe(3);
+        expect(result.scannedFiles).toBe(3);
         expect(result.scanner).toBe('ConventionSquattingScanner');
       } finally {
         cleanup(dir);

@@ -754,7 +754,7 @@ describe('SupplyChainScanner', () => {
       try {
         const result = await scanner.scan(dir);
         expect(result.findings).toHaveLength(0);
-        expect(result.filesScanned).toBe(0);
+        expect(result.scannedFiles).toBe(0);
       } finally {
         cleanup(dir);
       }

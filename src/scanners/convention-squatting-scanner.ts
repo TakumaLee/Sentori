@@ -416,7 +416,6 @@ export class ConventionSquattingScanner implements Scanner {
       scanner: this.name,
       findings,
       scannedFiles: files.length,
-      filesScanned: files.length,
       duration: Date.now() - start,
     };
   }

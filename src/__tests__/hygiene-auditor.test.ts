@@ -40,7 +40,7 @@ describe('HygieneAuditor', () => {
         const result = await auditor.scan(dir);
         expect(result.scanner).toBe('HygieneAuditor');
         expect(Array.isArray(result.findings)).toBe(true);
-        expect(typeof result.filesScanned).toBe('number');
+        expect(typeof result.scannedFiles).toBe('number');
         expect(typeof result.duration).toBe('number');
       } finally {
         cleanup(dir);
