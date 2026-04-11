@@ -80,6 +80,7 @@ export class ScannerRegistry {
             scanner: scanner.name,
             findings: [],
             duration: 0,
+            scannedFiles: 0,
             error: scanError,
           };
           completedCount++;
@@ -107,6 +108,7 @@ export class ScannerRegistry {
               scanner: scanner.name,
               findings: [],
               duration: Date.now() - start,
+              scannedFiles: 0,
               error: scanError,
             };
           } else {
@@ -119,6 +121,7 @@ export class ScannerRegistry {
             scanner: scanner.name,
             findings: [],
             duration: Date.now() - start,
+            scannedFiles: 0,
             error: scanError,
           };
         }

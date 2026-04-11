@@ -94,9 +94,12 @@ export const npmAttestationScanner: ScannerModule = {
           scanner: SCANNER_NAME,
           severity: 'info',
           rule: 'ATTESTATION-000',
+          title: 'No lock file found — npm attestation check skipped',
+          description: 'No lock file found — npm attestation check skipped',
           message: 'No lock file found — npm attestation check skipped',
           recommendation: 'Run `npm install` to generate package-lock.json',
         }],
+        scannedFiles: 0,
         duration: Date.now() - start,
       };
     }
@@ -110,6 +113,7 @@ export const npmAttestationScanner: ScannerModule = {
       return {
         scanner: SCANNER_NAME,
         findings: [],
+        scannedFiles: 0,
         duration: Date.now() - start,
       };
     }
@@ -140,6 +144,8 @@ export const npmAttestationScanner: ScannerModule = {
           scanner: SCANNER_NAME,
           severity: 'info',
           rule: 'ATTESTATION-001',
+          title: `"${pkg.name}@${pkg.version}" has no npm attestation (Sigstore provenance unverified)`,
+          description: `"${pkg.name}@${pkg.version}" has no npm attestation (Sigstore provenance unverified)`,
           message: `"${pkg.name}@${pkg.version}" has no npm attestation (Sigstore provenance unverified)`,
           recommendation: 'Use packages published with GitHub Actions OIDC provenance',
         });
@@ -151,6 +157,8 @@ export const npmAttestationScanner: ScannerModule = {
         scanner: SCANNER_NAME,
         severity: 'info',
         rule: 'ATTESTATION-002',
+        title: `${skipped} package(s) skipped due to network errors or timeouts`,
+        description: `${skipped} package(s) skipped due to network errors or timeouts`,
         message: `${skipped} package(s) skipped due to network errors or timeouts`,
         recommendation: 'Re-run with network access for complete attestation coverage',
       });
@@ -159,6 +167,7 @@ export const npmAttestationScanner: ScannerModule = {
     return {
       scanner: SCANNER_NAME,
       findings,
+      scannedFiles: uniquePackages.length,
       duration: Date.now() - start,
     };
   },

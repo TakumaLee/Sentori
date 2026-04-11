@@ -696,7 +696,7 @@ describe('PackageGateScanner.scan()', () => {
     const scanner = new PackageGateScanner();
     const result = await scanner.scan(tmpDir);
     expect(result.findings).toHaveLength(0);
-    expect(result.filesScanned).toBe(0);
+    expect(result.scannedFiles).toBe(0);
   });
 
   test('detects multi-version conflict from npm lock file', async () => {
@@ -725,7 +725,7 @@ describe('PackageGateScanner.scan()', () => {
     const scanner = new PackageGateScanner();
     const result = await scanner.scan(tmpDir);
 
-    expect(result.filesScanned).toBeGreaterThanOrEqual(1);
+    expect(result.scannedFiles).toBeGreaterThanOrEqual(1);
     const multiVersionFindings = result.findings.filter((f) => f.id === 'PKGATE-001');
     expect(multiVersionFindings.length).toBeGreaterThan(0);
     expect(multiVersionFindings[0].severity).toBe('medium');
@@ -822,7 +822,7 @@ describe('PackageGateScanner.scan()', () => {
     const scanner = new PackageGateScanner();
     const result = await scanner.scan('/tmp/nonexistent-sentori-test-dir-xyz');
     expect(result.findings).toHaveLength(0);
-    expect(result.filesScanned).toBe(0);
+    expect(result.scannedFiles).toBe(0);
   });
 });
 
@@ -1181,7 +1181,7 @@ describe('generatePackageGateReport', () => {
     return {
       scanner: 'PackageGateScanner',
       findings,
-      filesScanned: findings.length,
+      scannedFiles: findings.length,
       duration: 42,
     };
   }

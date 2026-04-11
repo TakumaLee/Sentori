@@ -68,7 +68,7 @@ export function printReport(report: ScanReport): void {
     for (const result of report.results) {
       if (result.findings.length === 0) continue;
 
-      const filesCount = result.scannedFiles ?? result.filesScanned ?? 0;
+      const filesCount = result.scannedFiles;
       console.log(
         chalk.bold.white(`  ── ${result.scanner} ──`) +
         chalk.gray(` (${filesCount} files, ${result.duration}ms)`)

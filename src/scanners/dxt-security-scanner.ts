@@ -149,7 +149,7 @@ export class DxtSecurityScanner implements Scanner {
     return {
       scanner: this.name,
       findings,
-      filesScanned: configFiles.length,
+      scannedFiles: configFiles.length,
       duration: Date.now() - start,
     };
   }

@@ -177,7 +177,7 @@ export function calculateSummary(results: ScanResult[]): ReportSummary {
   const scannerBreakdown: Record<string, Record<Severity, number>> = {};
 
   for (const result of results) {
-    scannedFiles += result.scannedFiles ?? result.filesScanned ?? 0;
+    scannedFiles += result.scannedFiles;
     duration += result.duration;
 
     // Initialize scanner breakdown
