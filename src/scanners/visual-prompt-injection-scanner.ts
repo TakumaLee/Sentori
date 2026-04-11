@@ -27,10 +27,11 @@ export class VisualPromptInjectionScanner implements Scanner {
       }
     }
 
-    // Scan image files only in deep-scan mode (OCR is slow)
+    // Scan image files only in deep-scan mode (OCR is slow).
     const imageFiles = this.findImageFiles(targetPath, options?.exclude, options?.sentoriIgnorePatterns, options?.includeWorkspaceProjects);
     if (!process.env.SENTORI_DEEP_SCAN) {
-      // Without OCR, emit one INFO summary instead of per-image findings
+      // Without OCR, emit one INFO summary instead of per-image findings,
+      // but only when image files are actually present.
       if (imageFiles.length > 0) {
         findings.push({
           id: 'VPI-IMG-SUMMARY',
@@ -51,20 +52,10 @@ export class VisualPromptInjectionScanner implements Scanner {
       };
     }
 
-
-    // Start the scan-level OCR time budget
-    this.ocrPool.startBudget();
-
-    // Process all images concurrently up to the pool's concurrency limit.
-    // Promise.all preserves order; each slot is gated by the pool internally.
-    const imageResults = await Promise.all(
-      imageFiles.map(async (imagePath) => {
-        scannedFiles++;
-        return this.scanImageFile({ path: imagePath, relativePath: path.relative(targetPath, imagePath), content: '' });
-      })
-    );
-    for (const imgFindings of imageResults) {
-      findings.push(...imgFindings);
+    for (const imagePath of imageFiles) {
+      scannedFiles++;
+      const imageFindings = await this.scanImageFile({ path: imagePath, relativePath: path.relative(targetPath, imagePath), content: '' });
+      findings.push(...imageFindings);
     }
 
     return {
