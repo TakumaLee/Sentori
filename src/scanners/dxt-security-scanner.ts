@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { z } from 'zod';
 import { Scanner, ScannerOptions, ScanResult, Finding, Severity } from '../types';
 
 // --- Types ---
@@ -46,6 +47,18 @@ export interface DxtExecutor {
   unrestricted?: boolean;
   [key: string]: unknown;
 }
+
+// --- Zod schemas ---
+
+// Validates the top-level structure of a DXT config file before passing it to
+// extractExtensions(). This prevents type-confusion crashes from malformed
+// JSON that happens to parse without error (e.g. a bare array or string).
+const DxtConfigFileSchema = z.union([
+  // Single extension at top level or nested under `extensions`/`dxt_extensions`
+  z.record(z.string(), z.unknown()),
+  // Some tools emit an array of extension configs
+  z.array(z.unknown()),
+]);
 
 // --- Helpers ---
 
@@ -104,17 +117,32 @@ export class DxtSecurityScanner implements Scanner {
     const configFiles = this.findDxtConfigs(targetDir);
 
     for (const file of configFiles) {
+      let content: string;
       try {
-        const content = fs.readFileSync(file, 'utf-8');
-        const parsed = JSON.parse(content);
-        const extensions = this.extractExtensions(parsed);
-        const relPath = path.relative(targetDir, file);
+        content = fs.readFileSync(file, 'utf-8');
+      } catch (err) {
+        process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'DxtSecurityScanner', file, error: 'Failed to read DXT config file — skipping', message: String(err) }) + '\n');
+        continue;
+      }
 
-        for (const [extName, ext] of extensions) {
-          findings.push(...this.auditExtension(extName, ext, relPath));
-        }
-      } catch {
-        // Skip unparseable files
+      let rawParsed: unknown;
+      try {
+        rawParsed = JSON.parse(content);
+      } catch (err) {
+        process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'DxtSecurityScanner', file, error: 'DXT config JSON parse failed — skipping', message: String(err) }) + '\n');
+        continue;
+      }
+      const dxtSchemaResult = DxtConfigFileSchema.safeParse(rawParsed);
+      if (!dxtSchemaResult.success) {
+        process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'DxtSecurityScanner', file, error: 'DXT config JSON has unexpected shape (not an object or array) — skipping', issues: dxtSchemaResult.error.issues }) + '\n');
+        continue;
+      }
+      const parsed: unknown = dxtSchemaResult.data;
+
+      const extensions = this.extractExtensions(parsed);
+      const relPath = path.relative(targetDir, file);
+      for (const [extName, ext] of extensions) {
+        findings.push(...this.auditExtension(extName, ext, relPath));
       }
     }
 

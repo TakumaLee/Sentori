@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { z } from 'zod';
 import { Scanner, ScannerOptions, ScanResult, Finding, Severity } from '../types';
 import { walkFiles } from '../utils/file-walker';
 
@@ -63,6 +64,41 @@ export interface AgentConfig {
   };
   [key: string]: unknown;
 }
+
+// Zod schema for AgentConfig — validates structure before use to prevent
+// downstream crashes from malformed agent config files in scanned projects.
+const AgentConfigSchema = z.object({
+  fileAccess: z.union([z.array(z.string()), z.string()]).optional(),
+  shellAccess: z.union([
+    z.object({ enabled: z.boolean().optional(), allowlist: z.array(z.string()).optional() }),
+    z.string(),
+  ]).optional(),
+  browserProfile: z.string().optional(),
+  costLimits: z.object({
+    dailyLimit: z.number().optional(),
+    monthlyLimit: z.number().optional(),
+    hardLimit: z.number().optional(),
+  }).optional(),
+  trading: z.object({
+    enabled: z.boolean().optional(),
+    simulationMode: z.boolean().optional(),
+    singleTradeLimit: z.number().optional(),
+    dailyLossLimit: z.number().optional(),
+    manualConfirmation: z.boolean().optional(),
+  }).optional(),
+  monitoring: z.object({
+    logging: z.boolean().optional(),
+    anomalyDetection: z.boolean().optional(),
+    killSwitch: z.boolean().optional(),
+    autoShutdown: z.boolean().optional(),
+  }).optional(),
+  systemPrompt: z.string().optional(),
+  promptDefenses: z.object({
+    identityLock: z.boolean().optional(),
+    inputSanitization: z.boolean().optional(),
+    outputGuards: z.boolean().optional(),
+  }).optional(),
+}).passthrough();
 
 interface CheckContext {
   targetDir: string;
@@ -542,11 +578,21 @@ export function loadAgentConfig(targetDir: string): AgentConfig {
   for (const name of CONFIG_FILENAMES) {
     const p = path.join(targetDir, name);
     if (fs.existsSync(p)) {
+      let raw: unknown;
       try {
-        return JSON.parse(fs.readFileSync(p, 'utf-8')) as AgentConfig;
-      } catch {
-        // continue
+        raw = JSON.parse(fs.readFileSync(p, 'utf-8'));
+      } catch (err) {
+        process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'HygieneAuditor', file: p, error: 'agent config JSON parse failed — skipping', message: String(err) }) + '\n');
+        continue;
       }
+      const result = AgentConfigSchema.safeParse(raw);
+      if (!result.success) {
+        // Fall back to the raw parsed object so scanning still runs; the schema
+        // adds defense-in-depth but should not silently disable all hygiene checks.
+        process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'HygieneAuditor', file: p, error: 'agent config schema validation failed — falling back to raw config', issues: result.error.issues }) + '\n');
+        return raw as AgentConfig;
+      }
+      return result.data as AgentConfig;
     }
   }
   return {};

@@ -1,6 +1,7 @@
 import * as https from 'node:https';
 import * as http from 'node:http';
 import * as fs from 'node:fs';
+import { z } from 'zod';
 import { ScannerModule, ScanResult, Finding, ScannerOptions } from '../types';
 
 /**
@@ -52,6 +53,33 @@ interface A2ASkill {
   [key: string]: unknown;
 }
 
+// ─── Zod schema for runtime validation of A2AAgentCard ───────────────────────
+
+const A2AAgentCardSchema = z.object({
+  name: z.string().optional(),
+  url: z.string().optional(),
+  version: z.string().optional(),
+  capabilities: z.object({
+    streaming: z.boolean().optional(),
+    pushNotifications: z.boolean().optional(),
+    stateTransitionHistory: z.boolean().optional(),
+  }).passthrough().optional(),
+  authentication: z.union([
+    z.null(),
+    z.object({ schemes: z.array(z.string()).optional(), credentials: z.unknown().optional() }).passthrough(),
+    z.array(z.object({ schemes: z.array(z.string()).optional(), credentials: z.unknown().optional() }).passthrough()),
+  ]).optional(),
+  defaultInputModes: z.array(z.string()).optional(),
+  defaultOutputModes: z.array(z.string()).optional(),
+  skills: z.array(z.object({
+    id: z.string().optional(),
+    name: z.string().optional(),
+    inputModes: z.array(z.string()).optional(),
+    outputModes: z.array(z.string()).optional(),
+    tags: z.array(z.string()).optional(),
+  }).passthrough()).optional(),
+}).passthrough();
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SCANNER_NAME = 'A2A Security Scanner';
@@ -81,17 +109,26 @@ const BROAD_CAPABILITY_COMBO = ['streaming', 'pushNotifications', 'stateTransiti
 
 // ─── HTTP fetch helper ────────────────────────────────────────────────────────
 
+// Maximum body size for a fetched agent card: 1 MB. Agent cards are small JSON
+// documents; capping prevents memory exhaustion from unbounded responses.
+const FETCH_MAX_BYTES = 1 * 1024 * 1024;
+
 function fetchUrl(url: string, timeoutMs = 8000, maxRedirects = 3): Promise<string> {
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const done = (fn: () => void): void => {
+      if (!settled) { settled = true; fn(); }
+    };
+
     const attempt = (currentUrl: string, hopsLeft: number): void => {
       const mod = currentUrl.startsWith('https://') ? https : http;
       const req = (mod as typeof https).get(currentUrl, { timeout: timeoutMs }, (res) => {
         const status = res.statusCode ?? 0;
         // Follow 301/302/303/307/308 redirects
         if ((status === 301 || status === 302 || status === 303 || status === 307 || status === 308) && res.headers.location) {
-          res.resume(); // drain response
+          res.resume(); // drain response to free the socket
           if (hopsLeft <= 0) {
-            reject(new Error(`Too many redirects fetching ${url}`));
+            done(() => reject(new Error(`Too many redirects fetching ${url}`)));
             return;
           }
           // Resolve relative redirect URLs against the current URL
@@ -103,17 +140,47 @@ function fetchUrl(url: string, timeoutMs = 8000, maxRedirects = 3): Promise<stri
           attempt(next, hopsLeft - 1);
           return;
         }
+
+        // Enforce response size cap via Content-Length header if present.
+        const contentLength = parseInt(res.headers['content-length'] ?? '0', 10);
+        if (contentLength > FETCH_MAX_BYTES) {
+          res.resume(); // drain to free the socket
+          done(() => reject(new Error(`Agent card response too large (Content-Length: ${contentLength} bytes) from ${currentUrl}`)));
+          return;
+        }
+
         const chunks: Buffer[] = [];
-        res.on('data', (chunk: Buffer) => chunks.push(chunk));
-        res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-        res.on('error', reject);
+        let totalBytes = 0;
+
+        res.on('data', (chunk: Buffer) => {
+          totalBytes += chunk.length;
+          if (totalBytes > FETCH_MAX_BYTES) {
+            res.resume(); // drain remaining data
+            done(() => reject(new Error(`Agent card response too large (> ${FETCH_MAX_BYTES} bytes) from ${currentUrl}`)));
+            return;
+          }
+          chunks.push(chunk);
+        });
+
+        res.on('end', () => {
+          done(() => resolve(Buffer.concat(chunks).toString('utf8')));
+        });
+
+        res.on('error', (err) => {
+          done(() => reject(err));
+        });
       });
-      req.on('error', reject);
+
+      req.on('error', (err) => {
+        done(() => reject(err));
+      });
+
       req.on('timeout', () => {
         req.destroy();
-        reject(new Error(`Request to ${currentUrl} timed out after ${timeoutMs}ms`));
+        done(() => reject(new Error(`Request to ${currentUrl} timed out after ${timeoutMs}ms`)));
       });
     };
+
     attempt(url, maxRedirects);
   });
 }
@@ -130,8 +197,19 @@ async function resolveAgentCard(input: string): Promise<{ card: A2AAgentCard; so
   const isFilePath = input.startsWith('/') || input.startsWith('./') || input.startsWith('../');
   if (isFilePath || fs.existsSync(input)) {
     const raw = fs.readFileSync(input, 'utf8');
-    const card = JSON.parse(raw) as A2AAgentCard;
-    return { card, source: input, isHttp: false };
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (err) {
+      process.stderr.write(JSON.stringify({ level: 'error', scanner: 'A2ASecurityScanner', source: input, error: 'JSON parse failed', message: String(err) }) + '\n');
+      throw new Error(`Invalid JSON in agent card file "${input}": ${String(err)}`);
+    }
+    const result = A2AAgentCardSchema.safeParse(parsed);
+    if (!result.success) {
+      process.stderr.write(JSON.stringify({ level: 'error', scanner: 'A2ASecurityScanner', source: input, error: 'Agent card schema validation failed', issues: result.error.issues }) + '\n');
+      throw new Error(`Invalid agent card structure in "${input}": schema validation failed`);
+    }
+    return { card: result.data as A2AAgentCard, source: input, isHttp: false };
   }
 
   // URL: normalize
@@ -145,8 +223,19 @@ async function resolveAgentCard(input: string): Promise<{ card: A2AAgentCard; so
   }
 
   const raw = await fetchUrl(url);
-  const card = JSON.parse(raw) as A2AAgentCard;
-  return { card, source: url, isHttp: url.startsWith('http://') };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    process.stderr.write(JSON.stringify({ level: 'error', scanner: 'A2ASecurityScanner', source: url, error: 'JSON parse failed', message: String(err) }) + '\n');
+    throw new Error(`Invalid JSON in agent card response from "${url}": ${String(err)}`);
+  }
+  const result = A2AAgentCardSchema.safeParse(parsed);
+  if (!result.success) {
+    process.stderr.write(JSON.stringify({ level: 'error', scanner: 'A2ASecurityScanner', source: url, error: 'Agent card schema validation failed', issues: result.error.issues }) + '\n');
+    throw new Error(`Invalid agent card structure from "${url}": schema validation failed`);
+  }
+  return { card: result.data as A2AAgentCard, source: url, isHttp: url.startsWith('http://') };
 }
 
 // ─── Audit functions ──────────────────────────────────────────────────────────

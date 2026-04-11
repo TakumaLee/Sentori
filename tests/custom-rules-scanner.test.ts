@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { runCustomRules, CUSTOM_RULES_SCANNER_NAME } from '../src/scanners/custom-rules-scanner';
+import { runCustomRules, CUSTOM_RULES_SCANNER_NAME, detectRedos } from '../src/scanners/custom-rules-scanner';
 import { CustomRule } from '../src/config/sentori-config';
 
 function makeTmpDir(): string {
@@ -23,6 +23,73 @@ function makeRule(overrides: Partial<CustomRule> = {}): CustomRule {
     ...overrides,
   };
 }
+
+describe('detectRedos', () => {
+  test('returns null for safe patterns', () => {
+    const safe = [
+      'AKIA[0-9A-Z]{16}',
+      '([a-z])+',
+      '\\w+',
+      '(ab){3}',
+      '(foo)?',
+      '(?=foo)bar',
+      '(?:abc){1,3}',
+      // alternation WITHOUT an outer repeating quantifier is safe
+      '(a|b)',
+    ];
+    for (const p of safe) {
+      expect(detectRedos(p)).toBeNull();
+    }
+  });
+
+  test('flags nested quantifier (\w+)+', () => {
+    expect(detectRedos('(\\w+)+')).not.toBeNull();
+  });
+
+  test('flags nested quantifier (a*)*', () => {
+    expect(detectRedos('(a*)*')).not.toBeNull();
+  });
+
+  test('flags nested quantifier (a+)*', () => {
+    expect(detectRedos('(a+)*')).not.toBeNull();
+  });
+
+  test('flags non-capturing group with nested quantifier (?:\\w+)+', () => {
+    expect(detectRedos('(?:\\w+)+')).not.toBeNull();
+  });
+
+  test('flags alternation with inner quantifiers ([a-z]+|[0-9]+)+', () => {
+    expect(detectRedos('([a-z]+|[0-9]+)+')).not.toBeNull();
+  });
+
+  test('flags unbounded {n,} inside quantified group (\\w{2,})+', () => {
+    expect(detectRedos('(\\w{2,})+')).not.toBeNull();
+  });
+
+  test('does not flag escaped quantifier chars in character class', () => {
+    // [+*] inside a character class is literal — not a quantifier
+    expect(detectRedos('([+*])+')).toBeNull();
+  });
+
+  test('error message mentions position and body snippet', () => {
+    const reason = detectRedos('(\\w+)+');
+    expect(reason).toMatch(/nested quantifier/i);
+    expect(reason).toMatch(/catastrophic backtracking/i);
+  });
+
+  // Alternation under a repeating quantifier — textbook ReDoS vectors
+  test('flags alternation under outer + quantifier (cat|dog)+', () => {
+    expect(detectRedos('(cat|dog)+')).not.toBeNull();
+  });
+
+  test('flags alternation under outer + quantifier (a|b)+', () => {
+    expect(detectRedos('(a|b)+')).not.toBeNull();
+  });
+
+  test('flags alternation with multiple alternatives under outer + quantifier (foo|bar|baz)+', () => {
+    expect(detectRedos('(foo|bar|baz)+')).not.toBeNull();
+  });
+});
 
 describe('runCustomRules', () => {
   test('pattern match returns finding with correct line number and evidence', async () => {
@@ -147,6 +214,21 @@ describe('runCustomRules', () => {
     }
   });
 
+  test('ReDoS pattern is rejected before compilation with info-level finding', async () => {
+    const dir = makeTmpDir();
+    writeFile(dir, 'file.ts', 'anything');
+    const rule = makeRule({ id: 'redos-rule', pattern: '(\\w+)+' });
+
+    const result = await runCustomRules(dir, [rule]);
+
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0].severity).toBe('info');
+    expect(result.findings[0].title).toContain('ReDoS risk');
+    expect(result.findings[0].rule).toBe('redos-rule');
+    expect(result.findings[0].evidence).toBe('(\\w+)+');
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
   test('multiple matches on same line produce multiple findings', async () => {
     const dir = makeTmpDir();
     writeFile(dir, 'multi.ts', 'AKIAIOSFODNN7EXAMPLE1 AKIAIOSFODNN7EXAMPLE2');
@@ -157,6 +239,34 @@ describe('runCustomRules', () => {
     expect(result.findings).toHaveLength(2);
     expect(result.findings[0].line).toBe(1);
     expect(result.findings[1].line).toBe(1);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('vendored dirs are skipped by default', async () => {
+    const dir = makeTmpDir();
+    writeFile(dir, 'src/app.ts', 'AKIAIOSFODNN7EXAMPLE1');
+    writeFile(dir, 'vendor/lib.ts', 'AKIAIOSFODNN7EXAMPLE2');
+    writeFile(dir, 'third_party/code.ts', 'AKIAIOSFODNN7EXAMPLE3');
+    const rule = makeRule();
+
+    const result = await runCustomRules(dir, [rule]);
+
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0].file).toBe('src/app.ts');
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('includeVendored: true scans VENDORED_IGNORE directories (e.g. third_party)', async () => {
+    const dir = makeTmpDir();
+    writeFile(dir, 'src/app.ts', 'AKIAIOSFODNN7EXAMPLE1');
+    writeFile(dir, 'third_party/code.ts', 'AKIAIOSFODNN7EXAMPLE2');
+    const rule = makeRule();
+
+    const result = await runCustomRules(dir, [rule], { includeVendored: true });
+
+    expect(result.findings).toHaveLength(2);
+    const files = result.findings.map((f) => f.file).sort();
+    expect(files).toEqual(['src/app.ts', 'third_party/code.ts']);
     fs.rmSync(dir, { recursive: true, force: true });
   });
 });

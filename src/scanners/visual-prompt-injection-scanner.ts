@@ -2,22 +2,16 @@ import { Scanner, ScanResult, Finding, Severity, ScannerOptions } from '../types
 import { walkFiles, FileEntry } from '../utils/file-walker';
 import { INJECTION_PATTERNS } from '../patterns/injection-patterns';
 import { shouldIgnoreFile } from '../utils/ignore-parser';
+import { OcrWorkerPool } from '../utils/ocr-worker-pool';
 import * as fs from 'fs';
 import * as path from 'path';
-
-// Dynamic import for tesseract.js (ESM module)
-let Tesseract: any = null;
-
-async function getTesseract() {
-  if (!Tesseract) {
-    Tesseract = await import('tesseract.js');
-  }
-  return Tesseract;
-}
 
 export class VisualPromptInjectionScanner implements Scanner {
   name = 'Visual Prompt Injection Scanner';
   description = 'Detects suspicious image processing + LLM vision API combinations and scans image files for embedded prompt injection text';
+
+  /** Exposed for testing; callers may inject a pool with custom settings. */
+  ocrPool: OcrWorkerPool = new OcrWorkerPool();
 
   async scan(targetPath: string, options?: ScannerOptions): Promise<ScanResult> {
     const start = Date.now();
@@ -58,10 +52,19 @@ export class VisualPromptInjectionScanner implements Scanner {
     }
 
 
-    for (const imagePath of imageFiles) {
-      scannedFiles++;
-      const imageFindings = await this.scanImageFile({ path: imagePath, relativePath: path.relative(targetPath, imagePath), content: '' });
-      findings.push(...imageFindings);
+    // Start the scan-level OCR time budget
+    this.ocrPool.startBudget();
+
+    // Process all images concurrently up to the pool's concurrency limit.
+    // Promise.all preserves order; each slot is gated by the pool internally.
+    const imageResults = await Promise.all(
+      imageFiles.map(async (imagePath) => {
+        scannedFiles++;
+        return this.scanImageFile({ path: imagePath, relativePath: path.relative(targetPath, imagePath), content: '' });
+      })
+    );
+    for (const imgFindings of imageResults) {
+      findings.push(...imgFindings);
     }
 
     return {
@@ -164,7 +167,8 @@ export class VisualPromptInjectionScanner implements Scanner {
   }
 
   /**
-   * PI-150: Scan image files for embedded prompt injection text using OCR
+   * PI-150: Scan image files for embedded prompt injection text using OCR.
+   * Uses OcrWorkerPool to enforce concurrency and scan-level time budget.
    */
   private async scanImageFile(file: FileEntry): Promise<Finding[]> {
     const findings: Finding[] = [];
@@ -188,27 +192,23 @@ export class VisualPromptInjectionScanner implements Scanner {
         return findings;
       }
 
-      // Perform OCR on image with timeout
-      const tesseract = await getTesseract();
-      const worker = await tesseract.createWorker('eng', undefined, {
-        logger: () => {}, // Disable logging to reduce noise
-      });
-      
-      const ocrTimeout = 30000; // 30 second timeout per image
-      const recognizePromise = worker.recognize(filePath);
-      const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('OCR timeout')), ocrTimeout)
-      );
-      
-      let text: string;
-      try {
-        const result = await Promise.race([recognizePromise, timeoutPromise]);
-        text = (result as any).data.text;
-      } catch (e) {
-        await worker.terminate();
+      // Early-exit if budget already consumed before we even queue
+      if (this.ocrPool.isBudgetExceeded()) {
         return findings;
       }
-      await worker.terminate();
+
+      let text: string;
+      try {
+        const result = await this.ocrPool.recognize(filePath);
+        if (result.budgetExceeded) {
+          // Budget exhausted — silently skip this image
+          return findings;
+        }
+        text = result.text;
+      } catch {
+        // Per-image OCR error (timeout, bad format, etc.) — skip
+        return findings;
+      }
 
       if (!text || text.trim().length === 0) {
         // No text detected in image
