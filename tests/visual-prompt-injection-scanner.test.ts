@@ -1,4 +1,5 @@
 import { VisualPromptInjectionScanner } from '../src/scanners/visual-prompt-injection-scanner';
+import { OcrWorkerPool } from '../src/utils/ocr-worker-pool';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -363,6 +364,53 @@ def analyze_web_image(image_url):
       expect(scanner.name).toBe('Visual Prompt Injection Scanner');
       expect(scanner.description.toLowerCase()).toContain('embedded');
       expect(scanner.description.toLowerCase()).toContain('image');
+    });
+  });
+
+  // === PI-150: OCR concurrency limit ===
+  describe('PI-150: OCR concurrency limit', () => {
+    test('OcrWorkerPool enforces max 4 simultaneous OCR calls', async () => {
+      // Inject a pool with concurrency=4 and patch runOcr to track concurrency
+      // without invoking real tesseract.
+      const pool = new OcrWorkerPool({ concurrency: 4, budgetMs: 60_000, timeoutMs: 5_000 });
+
+      let maxConcurrent = 0;
+      let activeCalls = 0;
+
+      // Patch private runOcr — acquire/release are real, so this correctly
+      // measures how many workers run simultaneously within the pool.
+      (pool as any).runOcr = async (_imagePath: string): Promise<{ text: string; budgetExceeded: boolean }> => {
+        activeCalls++;
+        maxConcurrent = Math.max(maxConcurrent, activeCalls);
+        await new Promise(resolve => setTimeout(resolve, 20));
+        activeCalls--;
+        return { text: '', budgetExceeded: false };
+      };
+
+      scanner.ocrPool = pool;
+
+      // 10 fake image files — large enough to saturate the pool's 4-slot limit
+      const imageCount = 10;
+      for (let i = 0; i < imageCount; i++) {
+        writeTestFile(`concurrent-test-${i}.png`, 'fake');
+      }
+
+      const origEnv = process.env.SENTORI_DEEP_SCAN;
+      process.env.SENTORI_DEEP_SCAN = '1';
+      try {
+        await scanner.scan(tempDir);
+      } finally {
+        if (origEnv === undefined) {
+          delete process.env.SENTORI_DEEP_SCAN;
+        } else {
+          process.env.SENTORI_DEEP_SCAN = origEnv;
+        }
+      }
+
+      // Must not exceed 4 concurrent OCR workers
+      expect(maxConcurrent).toBeLessThanOrEqual(4);
+      // Must have used at least some concurrency (not purely serial with 10 images)
+      expect(maxConcurrent).toBeGreaterThan(1);
     });
   });
 });
