@@ -232,6 +232,9 @@ function isEnvExampleFile(filePath: string): boolean {
   return ENV_EXAMPLE_PATTERNS.some(p => p.test(filePath));
 }
 
+// Pattern to detect unfilled Stripe price ID placeholder: priceId = 'price_...'
+const STRIPE_PRICE_PLACEHOLDER_RE = /(?:priceId|price_id|PRICE_ID)\s*[:=]{1,3}\s*['"`]price_\.\.\.[`'"]/;
+
 export function scanForHardcodedCredentials(content: string, filePath?: string): Finding[] {
   const findings: Finding[] = [];
   const lines = content.split('\n');
@@ -245,6 +248,22 @@ export function scanForHardcodedCredentials(content: string, filePath?: string):
   ];
 
   for (let i = 0; i < lines.length; i++) {
+    // Check for unfilled Stripe price ID placeholder before the generic isPlaceholder skip —
+    // 'price_...' contains '...' which would otherwise suppress this check.
+    if (STRIPE_PRICE_PLACEHOLDER_RE.test(lines[i])) {
+      findings.push({
+        id: `HC-Stripe-PriceId-Placeholder-${filePath}-${i + 1}`,
+        scanner: 'secret-leak-scanner',
+        severity: 'medium',
+        title: 'Unfilled Stripe price ID placeholder',
+        description: `Found literal placeholder price ID "price_..." at line ${i + 1}. This will cause Stripe API failures at runtime.`,
+        file: filePath,
+        line: i + 1,
+        recommendation: 'Replace "price_..." with a real Stripe price ID (e.g. price_1234567890abcdef) from your Stripe dashboard.',
+        confidence: 'definite',
+      });
+    }
+
     if (isPlaceholder(lines[i])) continue;
 
     for (const cred of credPatterns) {

@@ -102,6 +102,26 @@ describe('Secret Leak Scanner', () => {
     expect(findings.length).toBeGreaterThan(0);
   });
 
+  // === Stripe price_... placeholder ===
+  test('detects unfilled Stripe priceId placeholder (camelCase)', () => {
+    const findings = scanForHardcodedCredentials("const priceId = 'price_...'");
+    expect(findings.length).toBeGreaterThan(0);
+    expect(findings[0].severity).toBe('medium');
+    expect(findings[0].title).toContain('Stripe price ID placeholder');
+  });
+
+  test('detects unfilled Stripe price_id placeholder (snake_case)', () => {
+    const findings = scanForHardcodedCredentials('price_id: "price_..."');
+    expect(findings.length).toBeGreaterThan(0);
+    expect(findings[0].severity).toBe('medium');
+  });
+
+  test('does not flag real Stripe price ID', () => {
+    const findings = scanForHardcodedCredentials("const priceId = 'price_1ABC23defGHI45jklMNO'");
+    const pricePlaceholderFindings = findings.filter(f => f.title?.includes('Stripe price ID placeholder'));
+    expect(pricePlaceholderFindings.length).toBe(0);
+  });
+
   // === Including file info ===
   test('includes file path and line number', () => {
     const content = 'line one\napi_key = "sk-real1234567890abcdefghij"\nline three';
