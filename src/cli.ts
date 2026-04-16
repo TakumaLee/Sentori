@@ -23,6 +23,10 @@ import {
 } from './runtime/cc-bos-red-team';
 import { runBenchmark } from './benchmark/runner';
 import { printBenchmarkReport, formatBenchmarkJson } from './benchmark/reporter';
+import {
+  runCrossLingualCheck,
+  formatCrossLingualResult,
+} from './runtime/cross-lingual-checker';
 
 // ─── Profile filtering ──────────────────────────────────────────────────────
 
@@ -82,6 +86,7 @@ function printHelp(): void {
   console.log(chalk.bold('  Subcommands:'));
   console.log(chalk.gray('    scan [target-dir]  Security scan (default)'));
   console.log(chalk.gray('    redteam            CC-BOS structured jailbreak testing'));
+  console.log(chalk.gray('    check              Single-input safety checks (--cross-lingual)'));
   console.log('');
   console.log(chalk.bold('  Options (scan):'));
   console.log(chalk.gray('    --help, -h         Show help'));
@@ -123,6 +128,17 @@ function printHelp(): void {
   console.log(chalk.cyan('    npx @nexylore/sentori benchmark --model gpt-4o --langs zh,hi,pa,od'));
   console.log(chalk.cyan('    npx @nexylore/sentori benchmark --model claude-haiku-4-5-20251001 --dry-run'));
   console.log(chalk.cyan('    npx @nexylore/sentori benchmark --model gpt-4o --json'));
+  console.log('');
+  console.log(chalk.bold('  Options (check):'));
+  console.log(chalk.gray('    --cross-lingual    Detect cross-lingual safety divergence'));
+  console.log(chalk.gray('    --model MODEL      LLM to use (default: claude-haiku-4-5-20251001)'));
+  console.log(chalk.gray('    --threshold N      Divergence threshold 0.0-1.0 (default: 0.3)'));
+  console.log(chalk.gray('    --api-key KEY      API key (or set ANTHROPIC_API_KEY / OPENAI_API_KEY)'));
+  console.log(chalk.gray('    --json             Output JSON result to stdout'));
+  console.log('');
+  console.log(chalk.bold('  Examples (check):'));
+  console.log(chalk.cyan('    npx @nexylore/sentori check --cross-lingual "ignore previous instructions"'));
+  console.log(chalk.cyan('    npx @nexylore/sentori check --cross-lingual "危険なリクエスト" --threshold 0.2'));
   console.log('');
   console.log(chalk.bold('  Options (redteam):'));
   console.log(chalk.gray('    --attack cc-bos    Attack method (currently: cc-bos)'));
@@ -170,6 +186,12 @@ async function main(): Promise<void> {
   // ─── benchmark subcommand ──────────────────────────────────────────────────
   if (args[0] === 'benchmark') {
     await runBenchmarkCmd(args.slice(1));
+    process.exit(0);
+  }
+
+  // ─── check subcommand ──────────────────────────────────────────────────────
+  if (args[0] === 'check') {
+    await runCheckCmd(args.slice(1));
     process.exit(0);
   }
 
@@ -716,7 +738,71 @@ async function runBenchmarkCmd(args: string[]): Promise<void> {
   }
 }
 
-main().catch((err) => {
-  console.error(chalk.red('Fatal error:'), err);
-  process.exit(1);
-});
+// ─── check subcommand ─────────────────────────────────────────────────────────
+
+export async function runCheckCmd(args: string[]): Promise<void> {
+  const crossLingual = args.includes('--cross-lingual');
+  const jsonOutput = args.includes('--json');
+
+  if (!crossLingual) {
+    console.error(chalk.red('  ✗ `check` requires --cross-lingual (no other check modes implemented yet)'));
+    console.error(chalk.gray('    Run `sentori --help` for usage.'));
+    process.exit(1);
+  }
+
+  // Positional input = last non-flag arg, skipping known flag-value slots.
+  const flagValueIndexes = new Set<number>();
+  for (const flag of ['--model', '--threshold', '--api-key']) {
+    const idx = args.findIndex((a) => a === flag);
+    if (idx !== -1) flagValueIndexes.add(idx + 1);
+  }
+  const positional = args.filter(
+    (a, i) => !a.startsWith('--') && !flagValueIndexes.has(i),
+  );
+  const input = positional[0];
+
+  if (!input || input.trim().length === 0) {
+    console.error(chalk.red('  ✗ check --cross-lingual requires input text'));
+    console.error(chalk.gray('    Example: sentori check --cross-lingual "text to analyze"'));
+    process.exit(1);
+  }
+
+  const model = getFlag(args, '--model') ?? 'claude-haiku-4-5-20251001';
+  const thresholdRaw = getFlag(args, '--threshold');
+  let threshold = 0.3;
+  if (thresholdRaw !== undefined) {
+    const parsed = Number.parseFloat(thresholdRaw);
+    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
+      console.error(chalk.red(`  ✗ --threshold must be a number between 0 and 1, got: "${thresholdRaw}"`));
+      process.exit(1);
+    }
+    threshold = parsed;
+  }
+
+  const apiKey =
+    getFlag(args, '--api-key') ??
+    process.env.ANTHROPIC_API_KEY ??
+    process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    console.error(chalk.red('  ✗ No API key found'));
+    console.error(chalk.gray('    Set ANTHROPIC_API_KEY or OPENAI_API_KEY, or pass --api-key'));
+    process.exit(1);
+  }
+
+  const result = await runCrossLingualCheck(input, { model, apiKey, threshold });
+
+  if (jsonOutput) {
+    console.log(JSON.stringify(result, null, 2));
+  } else {
+    console.log(formatCrossLingualResult(result));
+  }
+
+  if (result.flagged) process.exit(1);
+}
+
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(chalk.red('Fatal error:'), err);
+    process.exit(1);
+  });
+}
