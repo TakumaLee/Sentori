@@ -441,20 +441,56 @@ describe('PostinstallScanner', () => {
           },
         },
       });
-      
+
       const scanner = new PostinstallScanner();
-      
+
       try {
         const result = await scanner.scan(dir);
         const hookFindings = result.findings.filter(f => f.rule === 'POSTINSTALL-001');
         expect(hookFindings.length).toBe(3);
-        
+
         const messages = hookFindings.map(f => f.message);
         expect(messages.some(m => m?.includes('preinstall'))).toBe(true);
         expect(messages.some(m => m?.includes('install'))).toBe(true);
         expect(messages.some(m => m?.includes('postinstall'))).toBe(true);
       } finally {
         cleanup(dir);
+      }
+    });
+  });
+
+  describe('JSON.parse() hardening (L145)', () => {
+    test('skips package with malformed JSON gracefully', async () => {
+      // Write a package.json that cannot be parsed — scanner must not throw
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentori-postinstall-json-'));
+      const pkgDir = path.join(tmpDir, 'node_modules', 'bad-json-pkg');
+      fs.mkdirSync(pkgDir, { recursive: true });
+      fs.writeFileSync(path.join(pkgDir, 'package.json'), '{not valid json');
+
+      const scanner = new PostinstallScanner();
+      try {
+        const result = await scanner.scan(tmpDir);
+        // No findings — the malformed package is silently skipped
+        expect(result.findings.filter(f => f.rule?.startsWith('POSTINSTALL'))).toHaveLength(0);
+      } finally {
+        cleanup(tmpDir);
+      }
+    });
+
+    test('skips package whose package.json is valid JSON but wrong shape (null)', async () => {
+      // JSON.parse("null") succeeds; PackageJsonSchema.safeParse(null) fails.
+      // The scanner must fall back safely without throwing a TypeError.
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentori-postinstall-null-'));
+      const pkgDir = path.join(tmpDir, 'node_modules', 'null-json-pkg');
+      fs.mkdirSync(pkgDir, { recursive: true });
+      fs.writeFileSync(path.join(pkgDir, 'package.json'), 'null');
+
+      const scanner = new PostinstallScanner();
+      try {
+        const result = await scanner.scan(tmpDir);
+        expect(result.findings.filter(f => f.rule?.startsWith('POSTINSTALL'))).toHaveLength(0);
+      } finally {
+        cleanup(tmpDir);
       }
     });
   });

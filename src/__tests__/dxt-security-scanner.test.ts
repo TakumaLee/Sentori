@@ -402,4 +402,16 @@ describe('DxtSecurityScanner', () => {
       cleanup(dir);
     }
   });
+
+  test('skips valid JSON with wrong shape (DxtConfigFileSchema validation)', async () => {
+    // A bare number / string / null passes JSON.parse but fails DxtConfigFileSchema
+    // (must be object or array). The scanner must skip silently without throwing.
+    const dir = createTempDir({ 'scalar.json': '42' });
+    try {
+      const result = await scanner.scan(dir);
+      expect(result.findings.length).toBe(0);
+    } finally {
+      cleanup(dir);
+    }
+  });
 });

@@ -577,6 +577,43 @@ describe('HygieneAuditor', () => {
         cleanup(dir);
       }
     });
+
+    test('skips malformed JSON and returns empty object', () => {
+      // agent.json contains invalid JSON — loadAgentConfig must not throw
+      const dir = createTempDir({ 'agent.json': '{bad json' });
+      try {
+        const config = loadAgentConfig(dir);
+        // Malformed file is skipped (continue); no other config file exists → {}
+        expect(config).toEqual({});
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('falls back safely when agent.json is valid JSON but wrong shape (null)', () => {
+      // JSON.parse("null") succeeds; AgentConfigSchema.safeParse(null) fails.
+      // Non-object raw → safeRaw = {} to avoid downstream ctx.config.xxx crashes.
+      const dir = createTempDir({ 'agent.json': 'null' });
+      try {
+        const config = loadAgentConfig(dir);
+        expect(config).toEqual({});
+      } finally {
+        cleanup(dir);
+      }
+    });
+
+    test('falls back to raw object when agent.json has unexpected extra fields', () => {
+      // Valid JSON object that contains fields not in AgentConfigSchema but does
+      // pass schema (passthrough) — the returned config should carry those fields.
+      const dir = createTempDir({ 'agent.json': JSON.stringify({ fileAccess: ['/data'], customKey: 'x' }) });
+      try {
+        const config = loadAgentConfig(dir);
+        expect(config.fileAccess).toEqual(['/data']);
+        expect((config as Record<string, unknown>).customKey).toBe('x');
+      } finally {
+        cleanup(dir);
+      }
+    });
   });
 
   // --- Integration ---

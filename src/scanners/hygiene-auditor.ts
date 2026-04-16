@@ -589,8 +589,13 @@ export function loadAgentConfig(targetDir: string): AgentConfig {
       if (!result.success) {
         // Fall back to the raw parsed object so scanning still runs; the schema
         // adds defense-in-depth but should not silently disable all hygiene checks.
+        // If raw is not a plain object (e.g. null / number), return {} instead to
+        // avoid downstream checks crashing on ctx.config.xxx access.
+        const safeRaw: AgentConfig = (typeof raw === 'object' && raw !== null && !Array.isArray(raw))
+          ? raw as AgentConfig
+          : {};
         process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'HygieneAuditor', file: p, error: 'agent config schema validation failed — falling back to raw config', issues: result.error.issues }) + '\n');
-        return raw as AgentConfig;
+        return safeRaw;
       }
       return result.data as AgentConfig;
     }

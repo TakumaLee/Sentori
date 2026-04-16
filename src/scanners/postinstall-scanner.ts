@@ -153,9 +153,13 @@ export class PostinstallScanner implements Scanner {
       if (!schemaResult.success) {
         process.stderr.write(JSON.stringify({ level: 'warn', scanner: 'PostinstallScanner', file: packageJsonPath, error: 'package.json schema validation failed — scanning raw', issues: schemaResult.error.issues }) + '\n');
       }
-      const pkg: PackageJson = (schemaResult.success ? schemaResult.data : raw) as PackageJson;
+      // When schema fails, fall back to raw only if it is a plain object to avoid
+      // a silent TypeError from null.scripts / 42.scripts further down.
+      const pkg: PackageJson | null = schemaResult.success
+        ? (schemaResult.data as PackageJson)
+        : (typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? raw as PackageJson : null);
 
-      if (!pkg.scripts) {
+      if (!pkg || !pkg.scripts) {
         return;
       }
 
