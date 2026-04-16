@@ -13,6 +13,7 @@ function makeFinding(overrides: Partial<Finding> = {}): Finding {
     severity: 'high',
     rule: 'SECRET-001',
     title: 'Secret detected',
+    description: 'test',
     message: 'Found a secret',
     file: 'src/config.ts',
     line: 10,
@@ -24,7 +25,7 @@ function makeReport(scannerName: string, findings: Finding[]): ScanReport {
   return {
     timestamp: new Date().toISOString(),
     target: '/tmp/test',
-    results: [{ scanner: scannerName, findings, duration: 100 }],
+    results: [{ scanner: scannerName, findings, scannedFiles: 1, duration: 100 }],
   };
 }
 

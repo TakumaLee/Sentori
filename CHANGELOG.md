@@ -4,6 +4,39 @@
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-04-16
+
+### Added
+- **File Watcher mode** — watch directories for changes and re-scan automatically
+- **Language Register Scanner** — detects language-level register misuse patterns
+- **Benchmark subcommand** (`sentori benchmark`) — dual-metric performance profiling for scanner throughput and accuracy
+- **CC-BOS Red Team subcommand** (`sentori redteam`) — structured jailbreak testing with CC-BOS framework
+- **OCR Worker Pool** — bounded concurrency + scan-level time budget for `--deep-scan` image analysis
+- **Per-scanner timeout + AbortController** — individual scanner execution time limits with graceful cancellation
+- **`--concurrency` CLI flag + `SENTORI_CONCURRENCY` env var** — user-configurable parallel scanner execution
+- **Structured error logging** — scanner errors classified into FileError / TimeoutError / LogicError categories
+- **ReDoS pre-validation** for custom-rules-scanner user-supplied regex patterns
+- **JSON.parse() Zod schema validation** — 37 call sites hardened with try-catch + Zod schema guards
+- **Console warning** when `SENTORI_CONCURRENCY` env var fails validation (helps CI debugging)
+- **Test coverage** for `classifyError` branches (FileError, NetworkError, SENTORI_DEBUG stack trace)
+- **Test coverage** for MCP Tool Result Injection Scanner (8.28% → ~98%)
+- **Geometric falcon mascot** and updated README branding
+
+### Changed
+- **Scanner/ScannerModule interfaces unified** — removed `as unknown as Scanner` type casts across codebase
+- **`types.ts` + `types/index.ts` consolidated** — eliminated dual type definition technical debt
+- **`custom-rules-scanner` `scan()` signature** — now accepts `ScannerOptions`, respects `includeVendored`
+- **`findImageFiles()` skipped** when `--deep-scan` is not set (performance optimization)
+
+### Fixed
+- Per-scanner timeout timer now cleared to prevent Node.js process leak
+- Evidence string truncation clamped with `Math.min` to prevent out-of-bounds access
+- DIMENSION_MAP completed for Custom Rules, PackageGateScanner, MCP Server Auditor
+- DIMENSION_MAP + persistence rule corrected for doc files
+- Credential detection false positives reduced
+- Agent workspace scanning false positives reduced
+- Codex review P1 issues resolved
+
 ## [0.11.0] - 2026-03-28
 
 ### Added

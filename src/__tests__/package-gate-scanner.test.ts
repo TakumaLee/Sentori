@@ -1202,10 +1202,10 @@ describe('generatePackageGateReport', () => {
 
   test('counts totalConflicts from PKGATE-001/002/003', () => {
     const findings: import('../types').Finding[] = [
-      { id: 'PKGATE-001', scanner: 'PackageGateScanner', severity: 'medium', file: '/project/package-lock.json' },
-      { id: 'PKGATE-002', scanner: 'PackageGateScanner', severity: 'high', file: '/project/package-lock.json' },
-      { id: 'PKGATE-003', scanner: 'PackageGateScanner', severity: 'medium', file: '/project/package-lock.json' },
-      { id: 'PKGATE-010', scanner: 'PackageGateScanner', severity: 'high' },
+      { id: 'PKGATE-001', scanner: 'PackageGateScanner', severity: 'medium', title: 'PKGATE-001', description: 'test', file: '/project/package-lock.json' },
+      { id: 'PKGATE-002', scanner: 'PackageGateScanner', severity: 'high', title: 'PKGATE-002', description: 'test', file: '/project/package-lock.json' },
+      { id: 'PKGATE-003', scanner: 'PackageGateScanner', severity: 'medium', title: 'PKGATE-003', description: 'test', file: '/project/package-lock.json' },
+      { id: 'PKGATE-010', scanner: 'PackageGateScanner', severity: 'high', title: 'PKGATE-010', description: 'test' },
     ];
     const report = generatePackageGateReport(makeScanResult(findings), TARGET);
     expect(report.totalConflicts).toBe(3);
@@ -1213,10 +1213,10 @@ describe('generatePackageGateReport', () => {
 
   test('counts suspiciousHooks from PKGATE-010/011/012/013', () => {
     const findings: import('../types').Finding[] = [
-      { id: 'PKGATE-010', scanner: 'PackageGateScanner', severity: 'high' },
-      { id: 'PKGATE-011', scanner: 'PackageGateScanner', severity: 'critical' },
-      { id: 'PKGATE-012', scanner: 'PackageGateScanner', severity: 'high' },
-      { id: 'PKGATE-013', scanner: 'PackageGateScanner', severity: 'info' },
+      { id: 'PKGATE-010', scanner: 'PackageGateScanner', severity: 'high', title: 'PKGATE-010', description: 'test' },
+      { id: 'PKGATE-011', scanner: 'PackageGateScanner', severity: 'critical', title: 'PKGATE-011', description: 'test' },
+      { id: 'PKGATE-012', scanner: 'PackageGateScanner', severity: 'high', title: 'PKGATE-012', description: 'test' },
+      { id: 'PKGATE-013', scanner: 'PackageGateScanner', severity: 'info', title: 'PKGATE-013', description: 'test' },
     ];
     const report = generatePackageGateReport(makeScanResult(findings), TARGET);
     expect(report.suspiciousHooks).toBe(4);
@@ -1224,9 +1224,9 @@ describe('generatePackageGateReport', () => {
 
   test('collects criticalFindings correctly', () => {
     const findings: import('../types').Finding[] = [
-      { id: 'PKGATE-011', scanner: 'PackageGateScanner', severity: 'critical' },
-      { id: 'PKGATE-010', scanner: 'PackageGateScanner', severity: 'high' },
-      { id: 'PKGATE-001', scanner: 'PackageGateScanner', severity: 'medium' },
+      { id: 'PKGATE-011', scanner: 'PackageGateScanner', severity: 'critical', title: 'PKGATE-011', description: 'test' },
+      { id: 'PKGATE-010', scanner: 'PackageGateScanner', severity: 'high', title: 'PKGATE-010', description: 'test' },
+      { id: 'PKGATE-001', scanner: 'PackageGateScanner', severity: 'medium', title: 'PKGATE-001', description: 'test' },
     ];
     const report = generatePackageGateReport(makeScanResult(findings), TARGET);
     expect(report.criticalFindings).toHaveLength(1);
@@ -1235,9 +1235,9 @@ describe('generatePackageGateReport', () => {
 
   test('collects unique lockFiles from conflict findings', () => {
     const findings: import('../types').Finding[] = [
-      { id: 'PKGATE-001', scanner: 'PackageGateScanner', severity: 'medium', file: '/project/package-lock.json' },
-      { id: 'PKGATE-002', scanner: 'PackageGateScanner', severity: 'high', file: '/project/package-lock.json' },
-      { id: 'PKGATE-001', scanner: 'PackageGateScanner', severity: 'medium', file: '/project/sub/package-lock.json' },
+      { id: 'PKGATE-001', scanner: 'PackageGateScanner', severity: 'medium', title: 'PKGATE-001', description: 'test', file: '/project/package-lock.json' },
+      { id: 'PKGATE-002', scanner: 'PackageGateScanner', severity: 'high', title: 'PKGATE-002', description: 'test', file: '/project/package-lock.json' },
+      { id: 'PKGATE-001', scanner: 'PackageGateScanner', severity: 'medium', title: 'PKGATE-001', description: 'test', file: '/project/sub/package-lock.json' },
     ];
     const report = generatePackageGateReport(makeScanResult(findings), TARGET);
     expect(report.lockFiles).toHaveLength(2);
@@ -1247,9 +1247,9 @@ describe('generatePackageGateReport', () => {
 
   test('allFindings contains all findings', () => {
     const findings: import('../types').Finding[] = [
-      { id: 'PKGATE-001', scanner: 'PackageGateScanner', severity: 'medium' },
-      { id: 'PKGATE-010', scanner: 'PackageGateScanner', severity: 'high' },
-      { id: 'PKGATE-011', scanner: 'PackageGateScanner', severity: 'critical' },
+      { id: 'PKGATE-001', scanner: 'PackageGateScanner', severity: 'medium', title: 'PKGATE-001', description: 'test' },
+      { id: 'PKGATE-010', scanner: 'PackageGateScanner', severity: 'high', title: 'PKGATE-010', description: 'test' },
+      { id: 'PKGATE-011', scanner: 'PackageGateScanner', severity: 'critical', title: 'PKGATE-011', description: 'test' },
     ];
     const report = generatePackageGateReport(makeScanResult(findings), TARGET);
     expect(report.allFindings).toHaveLength(3);
@@ -1257,7 +1257,7 @@ describe('generatePackageGateReport', () => {
 
   test('summary is human-readable and contains target', () => {
     const findings: import('../types').Finding[] = [
-      { id: 'PKGATE-001', scanner: 'PackageGateScanner', severity: 'medium', file: '/p/lock.json' },
+      { id: 'PKGATE-001', scanner: 'PackageGateScanner', severity: 'medium', title: 'PKGATE-001', description: 'test', file: '/p/lock.json' },
     ];
     const report = generatePackageGateReport(makeScanResult(findings), TARGET);
     expect(report.summary).toContain(TARGET);
@@ -1272,8 +1272,8 @@ describe('generatePackageGateReport', () => {
 
   test('summary lists conflicts and hooks when present', () => {
     const findings: import('../types').Finding[] = [
-      { id: 'PKGATE-001', scanner: 'PackageGateScanner', severity: 'medium', file: '/p/lock.json' },
-      { id: 'PKGATE-010', scanner: 'PackageGateScanner', severity: 'high' },
+      { id: 'PKGATE-001', scanner: 'PackageGateScanner', severity: 'medium', title: 'PKGATE-001', description: 'test', file: '/p/lock.json' },
+      { id: 'PKGATE-010', scanner: 'PackageGateScanner', severity: 'high', title: 'PKGATE-010', description: 'test' },
     ];
     const report = generatePackageGateReport(makeScanResult(findings), TARGET);
     expect(report.summary).toMatch(/conflict/i);

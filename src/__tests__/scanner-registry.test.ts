@@ -188,7 +188,8 @@ describe('ScannerRegistry.runAll', () => {
     registry.register(
       makeScanner('good', async () => ({
         scanner: 'good',
-        findings: [{ scanner: 'good', severity: 'medium' as const, message: 'test' }],
+        findings: [{ scanner: 'good', severity: 'medium' as const, title: 'good', description: 'test', message: 'test' }],
+        scannedFiles: 1,
         duration: 5,
       })),
     );

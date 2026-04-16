@@ -272,6 +272,8 @@ export class PostinstallScanner implements Scanner {
         scanner: this.name,
         severity: 'critical',
         rule: 'POSTINSTALL-006',
+        title: 'POSTINSTALL-006',
+        description: `Potential environment variable exfiltration in ${hook} script of "${packageName}"`,
         file,
         message: `Potential environment variable exfiltration in ${hook} script of "${packageName}"`,
         evidence: script,
