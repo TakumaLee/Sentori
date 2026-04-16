@@ -13,10 +13,10 @@ export interface WatchEvent {
 }
 
 const PACKAGE_SCANNERS = [
-  'SupplyChainScanner',
+  'Supply Chain Scanner',
   'NPM Attestation Scanner',
-  'PostinstallScanner',
-  'ConventionSquattingScanner',
+  'Postinstall Scanner',
+  'Convention Squatting Detector',
 ];
 
 const MCP_SCANNERS = [
