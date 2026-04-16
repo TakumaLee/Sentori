@@ -52,9 +52,14 @@ export class VisualPromptInjectionScanner implements Scanner {
       };
     }
 
-    for (const imagePath of imageFiles) {
-      scannedFiles++;
-      const imageFindings = await this.scanImageFile({ path: imagePath, relativePath: path.relative(targetPath, imagePath), content: '' });
+    this.ocrPool.startBudget();
+    const imageResults = await Promise.all(
+      imageFiles.map(imagePath =>
+        this.scanImageFile({ path: imagePath, relativePath: path.relative(targetPath, imagePath), content: '' })
+      )
+    );
+    scannedFiles += imageFiles.length;
+    for (const imageFindings of imageResults) {
       findings.push(...imageFindings);
     }
 
