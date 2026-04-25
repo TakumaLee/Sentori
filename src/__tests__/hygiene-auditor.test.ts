@@ -201,7 +201,7 @@ describe('HygieneAuditor', () => {
 
     test('FAIL when Stripe key found', async () => {
       const dir = createTempDir({
-        '.env': 'STRIPE_KEY=sk_live_FAKEKEYFORTESTING12345678',
+        '.env': 'STRIPE_KEY=sk_live_FAKE_KEY_FOR_TESTING',
       });
       try {
         const report = await auditor.audit(dir);
