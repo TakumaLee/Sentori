@@ -5,6 +5,7 @@ import * as path from 'path';
 import chalk from 'chalk';
 import { createDefaultRegistry } from './index';
 import { printReport, writeJsonReport, buildSarifReport, writeSarifReport } from './utils/reporter';
+import { buildCycloneDxReport, writeCycloneDxReport } from './formatters/cyclonedx';
 import { calculateSummary } from './utils/scorer';
 import { Scanner } from './types';
 import { loadSentoriConfig, SentoriConfig } from './config/sentori-config';
@@ -92,7 +93,7 @@ function printHelp(): void {
   console.log(chalk.gray('    --help, -h         Show help'));
   console.log(chalk.gray('    --version, -v      Show version'));
   console.log(chalk.gray('    --json             Output JSON report to stdout'));
-  console.log(chalk.gray('    --format FORMAT    Output format: pretty (default), json, sarif'));
+  console.log(chalk.gray('    --format FORMAT    Output format: pretty (default), json, sarif, cyclonedx'));
   console.log(chalk.gray('    --output, -o FILE  Save report to file (auto-detects format by extension)'));
   console.log(chalk.gray('    --ioc PATH         Path to external IOC blocklist JSON file'));
   console.log(chalk.gray('    --deep-scan        Enable OCR scanning of image files (slow)'));
@@ -196,19 +197,20 @@ async function main(): Promise<void> {
   }
 
   // Parse flags
-  let outputFormat: 'pretty' | 'json' | 'sarif' = 'pretty';
+  let outputFormat: 'pretty' | 'json' | 'sarif' | 'cyclonedx' = 'pretty';
   const formatIdx = args.findIndex((a) => a === '--format');
   if (formatIdx !== -1 && args[formatIdx + 1]) {
     const fmt = args[formatIdx + 1];
-    if (fmt === 'json' || fmt === 'sarif') outputFormat = fmt;
+    if (fmt === 'json' || fmt === 'sarif' || fmt === 'cyclonedx') outputFormat = fmt;
   }
   if (args.includes('--json')) outputFormat = 'json'; // backward compat
   const jsonMode = outputFormat === 'json';
   const sarifMode = outputFormat === 'sarif';
+  const cyclonedxMode = outputFormat === 'cyclonedx';
   const watchMode = args.includes('--watch');
 
-  if (watchMode && (jsonMode || sarifMode)) {
-    console.error(chalk.red('  ✗ --watch is not compatible with --json or --format sarif/json'));
+  if (watchMode && (jsonMode || sarifMode || cyclonedxMode)) {
+    console.error(chalk.red('  ✗ --watch is not compatible with --json or --format sarif/json/cyclonedx'));
     console.error(chalk.gray('    Use --output file.json to write reports to file instead'));
     process.exit(1);
   }
@@ -353,7 +355,7 @@ function timestamp(): string {
 
 interface ScanOptions {
   targetDir: string;
-  outputFormat: 'pretty' | 'json' | 'sarif';
+  outputFormat: 'pretty' | 'json' | 'sarif' | 'cyclonedx';
   outputPath?: string;
   iocPath?: string;
   profile: ProfileType;
@@ -378,9 +380,10 @@ async function runScan(opts: ScanOptions): Promise<void> {
   } = opts;
   const jsonMode = outputFormat === 'json';
   const sarifMode = outputFormat === 'sarif';
+  const cyclonedxMode = outputFormat === 'cyclonedx';
   const version = getVersion();
 
-  if (!jsonMode && !sarifMode) {
+  if (!jsonMode && !sarifMode && !cyclonedxMode) {
     if (opts.isRescan) {
       console.log(chalk.gray(`  [${timestamp()}] Re-scanning...`));
     } else {
@@ -490,7 +493,11 @@ async function runScan(opts: ScanOptions): Promise<void> {
     report.summary = calculateSummary(report.results);
   }
 
-  if (sarifMode && outputPath) {
+  if (cyclonedxMode && outputPath) {
+    writeCycloneDxReport(report, outputPath);
+  } else if (cyclonedxMode) {
+    console.log(JSON.stringify(buildCycloneDxReport(report), null, 2));
+  } else if (sarifMode && outputPath) {
     writeSarifReport(report, outputPath);
   } else if (sarifMode) {
     console.log(JSON.stringify(buildSarifReport(report), null, 2));
