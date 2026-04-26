@@ -26,7 +26,7 @@ inputs:
     required: false
     default: 'sentori-results.sarif'
   output-format:
-    description: 'Console output format: pretty, json, or sarif'
+    description: 'Console output format: pretty, json, sarif, or cyclonedx'
     required: false
     default: 'pretty'
 
