@@ -37,7 +37,7 @@ export * from './types';
 
 import { ScannerRegistry } from './scanner-registry';
 // Class-based scanners
-import { SupplyChainScanner } from './scanners/supply-chain-scanner';
+import { SupplyChainScanner, IOCBlocklist } from './scanners/supply-chain-scanner';
 import { HygieneAuditor } from './scanners/hygiene-auditor';
 import { DxtSecurityScanner } from './scanners/dxt-security-scanner';
 import { VisualPromptInjectionScanner } from './scanners/visual-prompt-injection-scanner';
@@ -72,11 +72,11 @@ import { githubToxicFlowScanner } from './scanners/github-toxic-flow-scanner';
 import { mcpOAuthAuditor } from './scanners/mcp-oauth-auditor';
 import { languageRegisterScanner } from './scanners/language-register-scanner';
 
-export function createDefaultRegistry(externalIOCPath?: string): ScannerRegistry {
+export function createDefaultRegistry(ioc?: IOCBlocklist): ScannerRegistry {
   const registry = new ScannerRegistry();
 
   // Class-based scanners
-  registry.register(new SupplyChainScanner(externalIOCPath));
+  registry.register(new SupplyChainScanner(ioc));
   registry.register(new HygieneAuditor());
   registry.register(new DxtSecurityScanner());
   registry.register(new VisualPromptInjectionScanner());

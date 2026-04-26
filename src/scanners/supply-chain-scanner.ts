@@ -61,10 +61,17 @@ function findLineNumber(content: string, matchIndex: number): number {
 export interface IOCBlocklist {
   malicious_ips: string[];
   malicious_domains: string[];
+  malicious_mcp_packages: string[];
+  malicious_mcp_servers: string[];
 }
 
 export function loadIOC(externalPath?: string): IOCBlocklist {
-  const base: IOCBlocklist = { ...defaultIOC };
+  const base: IOCBlocklist = {
+    malicious_ips: [...defaultIOC.malicious_ips],
+    malicious_domains: [...defaultIOC.malicious_domains],
+    malicious_mcp_packages: [...defaultIOC.malicious_mcp_packages],
+    malicious_mcp_servers: [...defaultIOC.malicious_mcp_servers],
+  };
   if (externalPath && fs.existsSync(externalPath)) {
     try {
       const extRaw: unknown = JSON.parse(fs.readFileSync(externalPath, 'utf-8'));
@@ -75,6 +82,12 @@ export function loadIOC(externalPath?: string): IOCBlocklist {
         }
         if (Array.isArray(ext.malicious_domains)) {
           base.malicious_domains = [...new Set([...base.malicious_domains, ...(ext.malicious_domains as string[])])];
+        }
+        if (Array.isArray(ext.malicious_mcp_packages)) {
+          base.malicious_mcp_packages = [...new Set([...base.malicious_mcp_packages, ...(ext.malicious_mcp_packages as string[])])];
+        }
+        if (Array.isArray(ext.malicious_mcp_servers)) {
+          base.malicious_mcp_servers = [...new Set([...base.malicious_mcp_servers, ...(ext.malicious_mcp_servers as string[])])];
         }
       }
     } catch (err) {
@@ -652,6 +665,46 @@ function capSeverityAtMedium(severity: Severity): Severity {
   return severity;
 }
 
+function createMcpPackageRule(ioc: IOCBlocklist): Rule {
+  return {
+    id: 'SUPPLY-010',
+    severity: 'high',
+    check(file: FileEntry): Finding[] {
+      if (!file.path.endsWith('package.json')) return [];
+      let pkg: unknown;
+      try {
+        pkg = JSON.parse(file.content);
+      } catch {
+        return [];
+      }
+      if (typeof pkg !== 'object' || pkg === null) return [];
+      const p = pkg as Record<string, unknown>;
+      const allDeps = {
+        ...((p.dependencies as Record<string, string>) ?? {}),
+        ...((p.devDependencies as Record<string, string>) ?? {}),
+      };
+      const findings: Finding[] = [];
+      for (const pkgName of Object.keys(allDeps)) {
+        if (ioc.malicious_mcp_packages.includes(pkgName)) {
+          findings.push({
+            scanner: 'SupplyChainScanner',
+            rule: 'SUPPLY-010',
+            severity: 'high',
+            title: `Known malicious MCP package detected: ${pkgName}`,
+            description: `Known malicious MCP package detected: ${pkgName}`,
+            file: file.relativePath,
+            line: 1,
+            message: `Known malicious MCP package detected: ${pkgName}`,
+            evidence: pkgName,
+            isThirdParty: false,
+          });
+        }
+      }
+      return findings;
+    },
+  };
+}
+
 // --- Scanner class ---
 
 export class SupplyChainScanner implements Scanner {
@@ -660,18 +713,19 @@ export class SupplyChainScanner implements Scanner {
 
   private rules: Rule[];
 
-  constructor(externalIOCPath?: string) {
-    const ioc = loadIOC(externalIOCPath);
+  constructor(ioc?: IOCBlocklist) {
+    const resolvedIOC = ioc ?? loadIOC();
     this.rules = [
       base64Rule,
       rceRule,
-      createIOCRule(ioc),
+      createIOCRule(resolvedIOC),
       credentialRule,
       exfilRule,
       persistenceRule,
       pythonPackageRule,
       pythonURLRequirementRule,
       setupPyRule,
+      createMcpPackageRule(resolvedIOC),
     ];
   }
 

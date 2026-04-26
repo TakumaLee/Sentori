@@ -4,6 +4,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import chalk from 'chalk';
 import { createDefaultRegistry } from './index';
+import { loadIOC } from './scanners/supply-chain-scanner';
+import { fetchRemoteIOC, mergeIOC } from './utils/ioc-updater';
 import { printReport, writeJsonReport, buildSarifReport, writeSarifReport } from './utils/reporter';
 import { buildCycloneDxReport, writeCycloneDxReport } from './formatters/cyclonedx';
 import { calculateSummary } from './utils/scorer';
@@ -394,7 +396,18 @@ async function runScan(opts: ScanOptions): Promise<void> {
     }
   }
 
-  const registry = createDefaultRegistry(iocPath);
+  const baseIOC = loadIOC(iocPath);
+  const remoteIOC = await fetchRemoteIOC();
+  const mergedIOC = remoteIOC ? await mergeIOC(baseIOC, remoteIOC) : baseIOC;
+  if (!jsonMode && !sarifMode && !cyclonedxMode) {
+    if (remoteIOC) {
+      console.log(chalk.gray('  ↻ IOC list updated from remote'));
+    } else {
+      console.log(chalk.gray('  ⚠ IOC remote fetch failed, using bundled list'));
+    }
+    console.log('');
+  }
+  const registry = createDefaultRegistry(mergedIOC);
 
   // Apply profile filter
   if (profile !== 'agent') {
