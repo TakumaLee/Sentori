@@ -4,6 +4,16 @@
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-04-26
+
+### Added
+- **CycloneDX 1.6 AI-BOM output** — export scan results as AI-BOM for EU AI Act compliance and audit evidence (`--format cyclonedx`)
+- **GitHub Code Scanning integration** — `upload-sarif: 'true'` in GitHub Action uploads findings directly to GitHub Security tab
+- **MCP Registry IOC auto-update** — fetches the latest known-malicious MCP server list on every scan
+- **A2A Protocol Security rules (7 new)** — covers Agent Card forgery, identity spoofing, replay attacks, capability escalation, and malicious output modes in Google A2A multi-agent environments
+- **CWE mapping for rules** — each rule now includes a CWE ID for integration with vulnerability management systems
+- **Rule-to-CWE mapping in CycloneDX formatter** — findings include standardized CWE references in AI-BOM output
+
 ## [0.12.0] - 2026-04-16
 
 ### Added

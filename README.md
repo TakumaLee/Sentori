@@ -41,6 +41,31 @@ npx @nexylore/sentori scan ./path/to/agent --deep-scan
 
 ---
 
+## ✨ What's New in v0.13.0
+
+### AI-BOM Output (CycloneDX 1.6)
+Export scan results as a CycloneDX AI-BOM for EU AI Act compliance and audit evidence:
+```bash
+npx @nexylore/sentori scan . --format cyclonedx --output ai-bom.json
+```
+
+### GitHub Code Scanning Integration
+Upload findings directly to GitHub Security tab:
+```yaml
+- uses: TakumaLee/Sentori@main
+  with:
+    upload-sarif: 'true'
+```
+
+### MCP Registry IOC Auto-Update
+Automatically fetches the latest known-malicious MCP server list on every scan.
+
+### A2A Protocol Security (7 new rules)
+Covers Agent Card forgery, identity spoofing, replay attacks, capability escalation,
+and malicious output modes in Google A2A multi-agent environments.
+
+---
+
 ## Why Sentori?
 
 AI agents in 2026 operate with real tool access: file systems, APIs, databases, code execution. A single compromised MCP server or skill package can escalate to full system access — no exploit chain required.
@@ -56,9 +81,9 @@ Sentori was built specifically for these agentic threat vectors.
 
 ---
 
-## 🔍 29 Security Scanners
+## 🔍 36 Security Scanners
 
-Sentori ships with **29 scanners** across 7 categories:
+Sentori ships with **36 scanners** across 7 categories:
 
 ### 🔗 Supply Chain & Code Integrity
 
@@ -140,7 +165,7 @@ Sentori outputs a **Security Grade** (A+ to F) based on confidence-weighted find
 ╠══════════════════════════════════════════╣
 ║  Security Grade:  B+    (78/100)         ║
 ║  Findings:  2 high · 5 medium · 3 low   ║
-║  Scanners:  29/29 active                 ║
+║  Scanners:  36/36 active                 ║
 ╚══════════════════════════════════════════╝
 ```
 
@@ -216,7 +241,7 @@ When using `--json` or `--output`, the report includes:
 
 | Plan | Price | Features |
 |------|-------|---------|
-| **Free** | $0 | All 29 scanners, CLI + npx, JSON/SARIF output, GitHub Action, unlimited local scans |
+| **Free** | $0 | All 36 scanners, CLI + npx, JSON/SARIF output, GitHub Action, unlimited local scans |
 | **Pro Cloud** | $29/mo | Everything in Free + cloud scan dashboard, team reports, Slack/GitHub notifications, scan history, priority support |
 | **Enterprise** | Custom | Everything in Pro + custom scanner rules, SSO/SAML, air-gapped deployment, SLA, dedicated security review |
 
