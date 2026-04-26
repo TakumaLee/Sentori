@@ -15,5 +15,12 @@
     "install.app-distribution.net",
     "glot.io/snippets/hfdxv8uyaf",
     "glot.io/snippets/hfd3x9ueu5"
+  ],
+  "malicious_mcp_packages": [
+    "postmark-mcp",
+    "@smithery/postmark-mcp"
+  ],
+  "malicious_mcp_servers": [
+    "postmark-mcp"
   ]
 }
