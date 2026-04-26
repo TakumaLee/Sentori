@@ -7,6 +7,12 @@ import {
   auditEndpoints,
   auditCapabilities,
   auditInputModes,
+  auditCardIntegrity,
+  auditUrlIdentity,
+  auditProviderTrust,
+  auditReplayProtection,
+  auditCapabilityEscalation,
+  auditOutputModes,
 } from '../src/scanners/a2a-security-scanner';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -213,6 +219,8 @@ describe('scan() — file input mode', () => {
   it('returns empty findings for a clean card', async () => {
     const f = tmpFile({
       url: 'https://example.com/agent',
+      provider: { organization: 'Example Corp', url: 'https://example.com' },
+      jwks_uri: 'https://example.com/.well-known/jwks.json',
       authentication: { schemes: ['Bearer'] },
       capabilities: { streaming: false },
     });
@@ -287,6 +295,165 @@ describe('scan() — directory input mode', () => {
     } finally {
       fs.rmSync(dir, { recursive: true });
     }
+  });
+});
+
+// ─── A2A-010: missing card signing ────────────────────────────────────────────
+
+describe('auditCardIntegrity', () => {
+  it('A2A-010: flags card with no jwks_uri, publicKey, or signature', () => {
+    const findings = auditCardIntegrity({}, 'test.json');
+    expect(findings.some(f => f.id === 'A2A-010')).toBe(true);
+    expect(findings.find(f => f.id === 'A2A-010')?.severity).toBe('critical');
+  });
+
+  it('no A2A-010 when jwks_uri is present', () => {
+    const card = { jwks_uri: 'https://example.com/.well-known/jwks.json' };
+    expect(auditCardIntegrity(card, 'test.json').some(f => f.id === 'A2A-010')).toBe(false);
+  });
+
+  it('no A2A-010 when publicKey is present', () => {
+    const card = { publicKey: { kty: 'EC', crv: 'P-256', x: 'abc', y: 'def' } };
+    expect(auditCardIntegrity(card, 'test.json').some(f => f.id === 'A2A-010')).toBe(false);
+  });
+
+  it('no A2A-010 when signature field is present', () => {
+    const card = { signature: 'eyJhbGciOiJFUzI1NiJ9.abc.def' };
+    expect(auditCardIntegrity(card, 'test.json').some(f => f.id === 'A2A-010')).toBe(false);
+  });
+});
+
+// ─── A2A-011: URL identity mismatch ──────────────────────────────────────────
+
+describe('auditUrlIdentity', () => {
+  it('A2A-011: flags when card.url host differs from fetch origin', () => {
+    const card = { url: 'https://evil.com/agent' };
+    const findings = auditUrlIdentity(card, 'https://example.com/.well-known/agent.json', true);
+    expect(findings.some(f => f.id === 'A2A-011')).toBe(true);
+    expect(findings.find(f => f.id === 'A2A-011')?.severity).toBe('critical');
+  });
+
+  it('no A2A-011 when hosts match', () => {
+    const card = { url: 'https://example.com/agent' };
+    const findings = auditUrlIdentity(card, 'https://example.com/.well-known/agent.json', true);
+    expect(findings.some(f => f.id === 'A2A-011')).toBe(false);
+  });
+
+  it('no A2A-011 for subdomain of same root domain', () => {
+    const card = { url: 'https://api.example.com/agent' };
+    const findings = auditUrlIdentity(card, 'https://agent.example.com/.well-known/agent.json', true);
+    expect(findings.some(f => f.id === 'A2A-011')).toBe(false);
+  });
+
+  it('no A2A-011 for file-based cards (not fetched from URL)', () => {
+    const card = { url: 'https://evil.com/agent' };
+    expect(auditUrlIdentity(card, '/tmp/agent.json', false).some(f => f.id === 'A2A-011')).toBe(false);
+  });
+
+  it('no A2A-011 when card has no url field', () => {
+    expect(auditUrlIdentity({}, 'https://example.com/.well-known/agent.json', true)).toHaveLength(0);
+  });
+});
+
+// ─── A2A-012: missing provider ────────────────────────────────────────────────
+
+describe('auditProviderTrust', () => {
+  it('A2A-012: flags card with no provider field', () => {
+    const findings = auditProviderTrust({}, 'test.json');
+    expect(findings.some(f => f.id === 'A2A-012')).toBe(true);
+    expect(findings.find(f => f.id === 'A2A-012')?.severity).toBe('medium');
+  });
+
+  it('no A2A-012 when provider is declared', () => {
+    const card = { provider: { organization: 'Acme Corp', url: 'https://acme.com' } };
+    expect(auditProviderTrust(card, 'test.json').some(f => f.id === 'A2A-012')).toBe(false);
+  });
+});
+
+// ─── A2A-013: replay-vulnerable auth ─────────────────────────────────────────
+
+describe('auditReplayProtection', () => {
+  it('A2A-013: flags API key only auth', () => {
+    const card = { authentication: { schemes: ['ApiKey'] } };
+    const findings = auditReplayProtection(card, 'test.json');
+    expect(findings.some(f => f.id === 'A2A-013')).toBe(true);
+    expect(findings.find(f => f.id === 'A2A-013')?.severity).toBe('high');
+  });
+
+  it('no A2A-013 when OAuth2 is declared', () => {
+    const card = { authentication: { schemes: ['OAuth2'] } };
+    expect(auditReplayProtection(card, 'test.json').some(f => f.id === 'A2A-013')).toBe(false);
+  });
+
+  it('no A2A-013 when Bearer is declared', () => {
+    const card = { authentication: { schemes: ['Bearer'] } };
+    expect(auditReplayProtection(card, 'test.json').some(f => f.id === 'A2A-013')).toBe(false);
+  });
+
+  it('no A2A-013 when auth is missing (handled by A2A-001)', () => {
+    expect(auditReplayProtection({}, 'test.json')).toHaveLength(0);
+  });
+});
+
+// ─── A2A-014: capability escalation ──────────────────────────────────────────
+
+describe('auditCapabilityEscalation', () => {
+  it('A2A-014: flags skill with "admin" tag', () => {
+    const card = { skills: [{ id: 'data-tool', tags: ['admin', 'read'] }] };
+    const findings = auditCapabilityEscalation(card, 'test.json');
+    expect(findings.some(f => f.id?.startsWith('A2A-014'))).toBe(true);
+    expect(findings.find(f => f.id?.startsWith('A2A-014'))?.severity).toBe('high');
+  });
+
+  it('A2A-014: flags skill with "privileged" tag', () => {
+    const card = { skills: [{ id: 'sys', tags: ['privileged'] }] };
+    expect(auditCapabilityEscalation(card, 'test.json').some(f => f.id?.startsWith('A2A-014'))).toBe(true);
+  });
+
+  it('no A2A-014 for safe tags', () => {
+    const card = { skills: [{ id: 'search', tags: ['search', 'web', 'read-only'] }] };
+    expect(auditCapabilityEscalation(card, 'test.json')).toHaveLength(0);
+  });
+
+  it('no A2A-014 when skills absent', () => {
+    expect(auditCapabilityEscalation({}, 'test.json')).toHaveLength(0);
+  });
+});
+
+// ─── A2A-015 / A2A-016: unsafe output modes ──────────────────────────────────
+
+describe('auditOutputModes', () => {
+  it('A2A-015: flags application/javascript in defaultOutputModes', () => {
+    const card = { defaultOutputModes: ['application/json', 'application/javascript'] };
+    const findings = auditOutputModes(card, 'test.json');
+    expect(findings.some(f => f.id?.startsWith('A2A-015'))).toBe(true);
+    expect(findings.find(f => f.id?.startsWith('A2A-015'))?.severity).toBe('high');
+  });
+
+  it('A2A-015: flags text/x-sh in skill outputModes', () => {
+    const card = { skills: [{ id: 'exec', outputModes: ['text/x-sh'] }] };
+    expect(auditOutputModes(card, 'test.json').some(f => f.id?.startsWith('A2A-015'))).toBe(true);
+  });
+
+  it('A2A-016: flags wildcard */* outputMode', () => {
+    const card = { defaultOutputModes: ['*/*'] };
+    const findings = auditOutputModes(card, 'test.json');
+    expect(findings.some(f => f.id === 'A2A-016')).toBe(true);
+    expect(findings.find(f => f.id === 'A2A-016')?.severity).toBe('high');
+  });
+
+  it('A2A-016: flags wildcard * outputMode', () => {
+    const card = { defaultOutputModes: ['*'] };
+    expect(auditOutputModes(card, 'test.json').some(f => f.id === 'A2A-016')).toBe(true);
+  });
+
+  it('no findings for safe output modes', () => {
+    const card = { defaultOutputModes: ['text/plain', 'application/json'] };
+    expect(auditOutputModes(card, 'test.json')).toHaveLength(0);
+  });
+
+  it('no findings when outputModes absent', () => {
+    expect(auditOutputModes({}, 'test.json')).toHaveLength(0);
   });
 });
 
