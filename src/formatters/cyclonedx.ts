@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import chalk from 'chalk';
 import { ScanReport, Finding } from '../types';
+import { lookupCWE } from '../utils/rule-to-cwe';
 
 function normalizeFinding(f: Finding): Finding {
   return {
@@ -95,7 +96,8 @@ export function buildCycloneDxReport(report: ScanReport): object {
       properties,
     };
 
-    // TODO: CWE mapping — requires rule-to-cwe.ts lookup table (future PR)
+    const cwes = lookupCWE(f.scanner, f.rule);
+    if (cwes.length > 0) vuln.cwes = cwes;
 
     if (f.evidence) vuln.detail = f.evidence;
     if (f.recommendation) vuln.recommendation = f.recommendation;
