@@ -109,7 +109,6 @@ function printSummaryBar(report: ScanReport): void {
   console.log(DIVIDER);
   console.log('');
 
-  // Grade display
   const gradeColor =
     s.score >= 80
       ? chalk.green.bold
@@ -122,79 +121,27 @@ function printSummaryBar(report: ScanReport): void {
   );
   console.log('');
 
-  // Finding counts
-  const counts = [
-    s.critical > 0 ? `${SEVERITY_ICONS.critical} ${s.critical} Critical` : null,
-    s.high > 0 ? `${SEVERITY_ICONS.high} ${s.high} High` : null,
-    s.medium > 0 ? `${SEVERITY_ICONS.medium} ${s.medium} Medium` : null,
-    s.info > 0 ? `${SEVERITY_ICONS.info} ${s.info} Info` : null,
-  ].filter(Boolean);
-
-  if (counts.length > 0) {
-    console.log(`  ${chalk.bold('Findings:')}  ${counts.join('  ')}`);
+  // One-line findings count (npm audit style)
+  if (s.totalFindings === 0) {
+    console.log(`  ${chalk.green('found 0 vulnerabilities')}`);
   } else {
-    console.log(`  ${chalk.bold('Findings:')}  ${chalk.green('None')}`);
+    const parts = [
+      s.critical > 0 ? `${SEVERITY_ICONS.critical} ${s.critical} critical` : null,
+      s.high > 0 ? `${SEVERITY_ICONS.high} ${s.high} high` : null,
+      s.medium > 0 ? `${SEVERITY_ICONS.medium} ${s.medium} medium` : null,
+      s.info > 0 ? `${SEVERITY_ICONS.info} ${s.info} info` : null,
+    ].filter(Boolean);
+    const label = s.totalFindings === 1 ? 'vulnerability' : 'vulnerabilities';
+    console.log(`  found ${chalk.bold(String(s.totalFindings))} ${label} (${parts.join('  ')})`);
   }
   console.log('');
 
-  // Dimension scores with progress bars
-  if (s.dimensions) {
-    console.log(`  ${chalk.bold('Dimensions:')}`);
-    const dims = [
-      { label: 'Code Safety', data: s.dimensions.codeSafety },
-      { label: 'Config Safety', data: s.dimensions.configSafety },
-      { label: 'Defense Score', data: s.dimensions.defenseScore },
-      { label: 'Env Safety', data: s.dimensions.environmentSafety },
-    ];
-    for (const dim of dims) {
-      const dimColor =
-        dim.data.score >= 80
-          ? chalk.green
-          : dim.data.score >= 60
-          ? chalk.yellow
-          : chalk.red;
-      const bar = progressBar(dim.data.score);
-      const findingStr = dim.data.findings === 1 ? '1 finding' : `${dim.data.findings} findings`;
-      console.log(
-        `    ${dim.label.padEnd(15)} ${dimColor((dim.data.grade).padEnd(3))} ${chalk.gray(`(${dim.data.score}/100)`)}  ${bar}  ${chalk.gray(findingStr)}`
-      );
-    }
-    console.log('');
-  }
-
-  // Per-scanner breakdown
-  if (s.scannerBreakdown) {
-    const hasFindings = Object.values(s.scannerBreakdown).some(
-      (c) => c.critical + c.high + c.medium + c.info > 0
-    );
-    if (hasFindings) {
-      console.log(`  ${chalk.bold('Per-Scanner:')}`);
-      for (const [scanner, counts] of Object.entries(s.scannerBreakdown)) {
-        const parts = [
-          counts.critical > 0 ? `${SEVERITY_ICONS.critical}${counts.critical}` : null,
-          counts.high > 0 ? `${SEVERITY_ICONS.high}${counts.high}` : null,
-          counts.medium > 0 ? `${SEVERITY_ICONS.medium}${counts.medium}` : null,
-          counts.info > 0 ? `${SEVERITY_ICONS.info}${counts.info}` : null,
-        ].filter(Boolean);
-        const total = counts.critical + counts.high + counts.medium + counts.info;
-        if (total > 0) {
-          console.log(`    ${scanner.padEnd(30)} ${parts.join(' ')}`);
-        }
-      }
-      console.log('');
-    }
-  }
-
-  // Timing
   const durationSec = (s.duration / 1000).toFixed(1);
   console.log(
-    chalk.gray(
-      `  ⏱️  Completed in ${durationSec}s  |  ${s.scannedFiles} files scanned`
-    )
+    chalk.gray(`  ⏱️  Completed in ${durationSec}s  |  ${s.scannedFiles} files scanned`)
   );
   console.log('');
 
-  // Final verdict
   if (s.critical > 0) {
     console.log(chalk.red.bold('  ⚠️  CRITICAL issues found! Address these immediately.'));
   } else if (s.high > 0) {

@@ -18,11 +18,11 @@ inputs:
     required: false
     default: 'false'
   upload-sarif:
-    description: 'Upload SARIF results to GitHub Code Scanning'
+    description: 'Upload SARIF results to GitHub Code Scanning (requires `security-events: write` permission)'
     required: false
     default: 'false'
   sarif-file:
-    description: 'Path to write the SARIF output file (must end with .sarif)'
+    description: 'Path to write the SARIF output file (must end with .sarif, used with upload-sarif)'
     required: false
     default: 'sentori-results.sarif'
   output-format:
@@ -52,7 +52,7 @@ runs:
         set +e
 
         if [ "$UPLOAD_SARIF" = "true" ]; then
-          npx -y @nexylore/sentori@latest scan "$SCAN_PATH" --output "$SARIF_FILE"
+          npx -y @nexylore/sentori@latest scan "$SCAN_PATH" --format sarif --output "$SARIF_FILE"
         elif [ "$OUTPUT_FORMAT" = "json" ]; then
           npx -y @nexylore/sentori@latest scan "$SCAN_PATH" --format json
         elif [ "$OUTPUT_FORMAT" = "sarif" ]; then
